@@ -1,1 +1,4 @@
 project_id = "lcyzjojsoqneghoqheia"
+
+[functions.upload-to-atproto]
+verify_jwt = false
