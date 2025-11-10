@@ -5,6 +5,8 @@ import { UploadResult } from "@/components/UploadResult";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+const ATPROTO_DID = 'did:plc:l37td5yhxl2irrzrgvei4qay';
+
 interface UploadResponse {
   success: boolean;
   blob?: {
@@ -96,6 +98,7 @@ const Index = () => {
                 imageUrl={uploadResult.imageUrl}
                 blobCid={uploadResult.blobCid}
                 recordUri={uploadResult.recordUri}
+                did={ATPROTO_DID}
               />
             </div>
           )}

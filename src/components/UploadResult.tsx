@@ -7,11 +7,15 @@ interface UploadResultProps {
   imageUrl: string;
   blobCid: string;
   recordUri: string;
+  did: string;
 }
 
-export const UploadResult = ({ imageUrl, blobCid, recordUri }: UploadResultProps) => {
+export const UploadResult = ({ imageUrl, blobCid, recordUri, did }: UploadResultProps) => {
   const [copiedCid, setCopiedCid] = useState(false);
   const [copiedUri, setCopiedUri] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  const blobUrl = `https://altq.net/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${blobCid}`;
 
   const copyToClipboard = async (text: string, setCopied: (value: boolean) => void) => {
     await navigator.clipboard.writeText(text);
@@ -33,6 +37,30 @@ export const UploadResult = ({ imageUrl, blobCid, recordUri }: UploadResultProps
         </div>
 
         <div className="space-y-4">
+
+          <div>
+            <label className="text-sm font-medium text-muted-foreground mb-2 block">
+              Blob URL
+            </label>
+            <div className="flex gap-2">
+              <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm font-mono break-all text-foreground">
+                {blobUrl}
+              </code>
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => copyToClipboard(blobUrl, setCopiedUrl)}
+                className="shrink-0"
+              >
+                {copiedUrl ? (
+                  <Check className="w-4 h-4 text-accent" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
               Blob CID
