@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Cloud } from "lucide-react";
 import { UploadZone } from "@/components/UploadZone";
 import { UploadResult } from "@/components/UploadResult";
+import { AuthButton } from "@/components/AuthButton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -24,8 +27,31 @@ const Index = () => {
     imageUrl: string;
     blobCid: string;
     recordUri: string;
+    did: string;
   } | null>(null);
+  const [user, setUser] = useState<{ handle: string; avatar?: string } | null>(null);
+  const [userPassword, setUserPassword] = useState<string | null>(null);
+  const [useUserPds, setUseUserPds] = useState(false);
   const { toast } = useToast();
+
+  const handleLogin = async (handle: string, password: string) => {
+    setUser({ handle });
+    setUserPassword(password);
+    toast({
+      title: "Logged in",
+      description: `Logged in as @${handle}`,
+    });
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setUserPassword(null);
+    setUseUserPds(false);
+    toast({
+      title: "Logged out",
+      description: "You have been logged out",
+    });
+  };
 
   const handleFileSelect = async (file: File) => {
     setIsUploading(true);
@@ -34,6 +60,12 @@ const Index = () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('useUserPds', useUserPds.toString());
+      
+      if (useUserPds && user && userPassword) {
+        formData.append('userIdentifier', user.handle);
+        formData.append('userPassword', userPassword);
+      }
 
       const { data, error } = await supabase.functions.invoke<UploadResponse>('upload-to-atproto', {
         body: formData,
@@ -46,10 +78,13 @@ const Index = () => {
       }
 
       const imageUrl = URL.createObjectURL(file);
+      const did = useUserPds && user ? `did:plc:${user.handle}` : ATPROTO_DID;
+      
       setUploadResult({
         imageUrl,
         blobCid: data.blob.ref.$link,
         recordUri: data.uri,
+        did,
       });
 
       toast({
@@ -69,8 +104,12 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
+    <div className="min-h-screen bg-background">
       <div className="container max-w-4xl mx-auto px-4 py-12">
+        <div className="absolute top-4 right-4">
+          <AuthButton user={user} onLogin={handleLogin} onLogout={handleLogout} />
+        </div>
+        
         <header className="text-center mb-12">
           <div className="inline-flex items-center justify-center mb-6">
             <div className="relative">
@@ -90,6 +129,18 @@ const Index = () => {
         </header>
 
         <main className="space-y-8">
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <Switch
+              id="pds-toggle"
+              checked={useUserPds}
+              onCheckedChange={setUseUserPds}
+              disabled={!user}
+            />
+            <Label htmlFor="pds-toggle" className="text-foreground">
+              {useUserPds ? "Saving to your PDS" : "Saving to altq.net"}
+            </Label>
+          </div>
+          
           <UploadZone onFileSelect={handleFileSelect} isUploading={isUploading} />
           
           {uploadResult && (
@@ -98,7 +149,7 @@ const Index = () => {
                 imageUrl={uploadResult.imageUrl}
                 blobCid={uploadResult.blobCid}
                 recordUri={uploadResult.recordUri}
-                did={ATPROTO_DID}
+                did={uploadResult.did}
               />
             </div>
           )}

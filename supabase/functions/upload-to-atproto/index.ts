@@ -21,21 +21,21 @@ interface BlobData {
 
 interface FileRecord {
   blob: BlobData;
-  $type: 'uk.madebydanny.cdn.file';
+  $type: 'uk.madebydanny.cdn.img';
   langs: string[];
   createdAt: string;
 }
 
-async function createATProtoSession(password: string) {
-  console.log('Creating ATProto session...');
-  const response = await fetch(`${ATPROTO_SERVICE}/xrpc/com.atproto.server.createSession`, {
+async function createATProtoSession(identifier: string, password: string, pdsUrl: string) {
+  console.log('Creating ATProto session for:', identifier);
+  const response = await fetch(`${pdsUrl}/xrpc/com.atproto.server.createSession`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      identifier: ATPROTO_DID,
-      password: password,
+      identifier,
+      password,
     }),
   });
 
@@ -50,9 +50,9 @@ async function createATProtoSession(password: string) {
   return data.accessJwt;
 }
 
-async function uploadBlob(accessToken: string, fileData: Uint8Array, mimeType: string) {
+async function uploadBlob(accessToken: string, fileData: Uint8Array, mimeType: string, pdsUrl: string) {
   console.log('Uploading blob to ATProto...');
-  const response = await fetch(`${ATPROTO_SERVICE}/xrpc/com.atproto.repo.uploadBlob`, {
+  const response = await fetch(`${pdsUrl}/xrpc/com.atproto.repo.uploadBlob`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -72,25 +72,25 @@ async function uploadBlob(accessToken: string, fileData: Uint8Array, mimeType: s
   return data.blob;
 }
 
-async function createRecord(accessToken: string, blobData: BlobData) {
+async function createRecord(accessToken: string, blobData: BlobData, pdsUrl: string, did: string) {
   console.log('Creating ATProto record...');
   
   const record: FileRecord = {
     blob: blobData,
-    $type: 'uk.madebydanny.cdn.file',
+    $type: 'uk.madebydanny.cdn.img',
     langs: ['en'],
     createdAt: new Date().toISOString(),
   };
 
-  const response = await fetch(`${ATPROTO_SERVICE}/xrpc/com.atproto.repo.createRecord`, {
+  const response = await fetch(`${pdsUrl}/xrpc/com.atproto.repo.createRecord`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      repo: ATPROTO_DID,
-      collection: 'uk.madebydanny.cdn.file',
+      repo: did,
+      collection: 'uk.madebydanny.cdn.img',
       record: record,
     }),
   });
@@ -113,33 +113,51 @@ Deno.serve(async (req) => {
 
   try {
     console.log('Upload request received');
-    const password = Deno.env.get('ATPROTO_PASSWORD');
     
-    if (!password) {
-      throw new Error('ATPROTO_PASSWORD not configured');
-    }
-
     const formData = await req.formData();
     const file = formData.get('file') as File;
-
+    const useUserPds = formData.get('useUserPds') === 'true';
+    const userIdentifier = formData.get('userIdentifier') as string | null;
+    const userPassword = formData.get('userPassword') as string | null;
+    
     if (!file) {
       throw new Error('No file provided');
     }
 
     console.log('Processing file:', file.name, 'Type:', file.type, 'Size:', file.size);
+    console.log('Use user PDS:', useUserPds);
+
+    let accessToken: string;
+    let pdsUrl: string;
+    let did: string;
+
+    if (useUserPds && userIdentifier && userPassword) {
+      // User's PDS
+      pdsUrl = 'https://bsky.social';
+      did = userIdentifier;
+      console.log('Using user PDS for:', userIdentifier);
+      accessToken = await createATProtoSession(userIdentifier, userPassword, pdsUrl);
+    } else {
+      // altq.net PDS
+      const password = Deno.env.get('ATPROTO_PASSWORD');
+      if (!password) {
+        throw new Error('ATPROTO_PASSWORD not configured');
+      }
+      pdsUrl = ATPROTO_SERVICE;
+      did = ATPROTO_DID;
+      console.log('Using altq.net PDS');
+      accessToken = await createATProtoSession(ATPROTO_DID, password, pdsUrl);
+    }
 
     // Read file data
     const arrayBuffer = await file.arrayBuffer();
     const fileData = new Uint8Array(arrayBuffer);
 
-    // Create session
-    const accessToken = await createATProtoSession(password);
-
     // Upload blob
-    const blobData = await uploadBlob(accessToken, fileData, file.type);
+    const blobData = await uploadBlob(accessToken, fileData, file.type, pdsUrl);
 
     // Create record
-    const recordData = await createRecord(accessToken, blobData);
+    const recordData = await createRecord(accessToken, blobData, pdsUrl, did);
 
     console.log('Upload completed successfully');
 
