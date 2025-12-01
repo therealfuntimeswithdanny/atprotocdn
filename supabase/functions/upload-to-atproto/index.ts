@@ -117,8 +117,8 @@ Deno.serve(async (req) => {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     const useUserPds = formData.get('useUserPds') === 'true';
-    const userIdentifier = formData.get('userIdentifier') as string | null;
-    const userPassword = formData.get('userPassword') as string | null;
+    const userAccessToken = formData.get('accessToken') as string | null;
+    const userDid = formData.get('userDid') as string | null;
     
     if (!file) {
       throw new Error('No file provided');
@@ -131,12 +131,12 @@ Deno.serve(async (req) => {
     let pdsUrl: string;
     let did: string;
 
-    if (useUserPds && userIdentifier && userPassword) {
-      // User's PDS
+    if (useUserPds && userAccessToken && userDid) {
+      // User's PDS with OAuth token
       pdsUrl = 'https://pds.madebydanny.uk';
-      did = userIdentifier;
-      console.log('Using user PDS for:', userIdentifier);
-      accessToken = await createATProtoSession(userIdentifier, userPassword, pdsUrl);
+      did = userDid;
+      accessToken = userAccessToken;
+      console.log('Using user PDS with OAuth for:', userDid);
     } else {
       // altq.net PDS
       const password = Deno.env.get('ATPROTO_PASSWORD');

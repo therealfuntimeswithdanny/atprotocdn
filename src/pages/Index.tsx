@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Cloud } from "lucide-react";
 import { UploadZone } from "@/components/UploadZone";
 import { UploadResult } from "@/components/UploadResult";
 import { AuthButton } from "@/components/AuthButton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { handleOAuthCallback, revokeOAuthSession, getAccessToken } from "@/lib/oauth";
 
 const ATPROTO_DID = 'did:plc:l37td5yhxl2irrzrgvei4qay';
 
@@ -28,26 +29,37 @@ const Index = () => {
     recordUri: string;
     did: string;
   } | null>(null);
-  const [user, setUser] = useState<{ handle: string; avatar?: string } | null>(null);
-  const [userPassword, setUserPassword] = useState<string | null>(null);
+  const [user, setUser] = useState<{ handle: string; did: string; avatar?: string } | null>(null);
   const { toast } = useToast();
 
-  const handleLogin = async (handle: string, password: string) => {
-    setUser({ handle });
-    setUserPassword(password);
-    toast({
-      title: "Logged in",
-      description: `Logged in as @${handle}`,
-    });
-  };
+  // Handle OAuth callback on page load
+  useEffect(() => {
+    const checkOAuthCallback = async () => {
+      const result = await handleOAuthCallback();
+      if (result) {
+        setUser({
+          handle: result.handle,
+          did: result.did,
+        });
+        toast({
+          title: "Login successful",
+          description: `Logged in as @${result.handle}`,
+        });
+      }
+    };
+    
+    checkOAuthCallback();
+  }, [toast]);
 
-  const handleLogout = () => {
-    setUser(null);
-    setUserPassword(null);
-    toast({
-      title: "Logged out",
-      description: "You have been logged out",
-    });
+  const handleLogout = async () => {
+    if (user) {
+      await revokeOAuthSession(user.did);
+      setUser(null);
+      toast({
+        title: "Logged out",
+        description: "You have been logged out",
+      });
+    }
   };
 
   const handleFileSelect = async (file: File) => {
@@ -58,13 +70,17 @@ const Index = () => {
       const formData = new FormData();
       formData.append('file', file);
       
-      // If logged in, use user's PDS; otherwise use altq.net
+      // If logged in, use user's PDS with OAuth token; otherwise use altq.net
       const useUserPds = !!user;
       formData.append('useUserPds', useUserPds.toString());
       
-      if (useUserPds && user && userPassword) {
-        formData.append('userIdentifier', user.handle);
-        formData.append('userPassword', userPassword);
+      if (useUserPds && user) {
+        const accessToken = await getAccessToken(user.did);
+        if (!accessToken) {
+          throw new Error('Failed to get access token');
+        }
+        formData.append('accessToken', accessToken);
+        formData.append('userDid', user.did);
       }
 
       const { data, error } = await supabase.functions.invoke<UploadResponse>('upload-to-atproto', {
@@ -107,7 +123,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <div className="container max-w-4xl mx-auto px-4 py-12">
         <div className="absolute top-4 right-4">
-          <AuthButton user={user} onLogin={handleLogin} onLogout={handleLogout} />
+          <AuthButton user={user} onLogout={handleLogout} />
         </div>
         
         <header className="text-center mb-12">

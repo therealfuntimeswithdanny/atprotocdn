@@ -1,42 +1,48 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { LogIn, LogOut, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { LogIn, LogOut, Loader2, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { initiateOAuthLogin } from "@/lib/oauth";
 
 interface AuthButtonProps {
-  user: { handle: string; avatar?: string } | null;
-  onLogin: (handle: string, password: string) => void;
+  user: { handle: string; did: string; avatar?: string } | null;
   onLogout: () => void;
 }
 
-export const AuthButton = ({ user, onLogin, onLogout }: AuthButtonProps) => {
-  const [open, setOpen] = useState(false);
+export const AuthButton = ({ user, onLogout }: AuthButtonProps) => {
+  const [isOpen, setIsOpen] = useState(false);
   const [handle, setHandle] = useState("");
-  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!handle) {
+      toast({
+        title: "Missing handle",
+        description: "Please enter your handle",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
-      await onLogin(handle, password);
-      setOpen(false);
-      setHandle("");
-      setPassword("");
+      await initiateOAuthLogin(handle);
+      // OAuth flow will redirect the user
     } catch (error) {
+      setIsLoading(false);
       toast({
         title: "Login failed",
-        description: error instanceof Error ? error.message : "Failed to login",
+        description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -44,13 +50,12 @@ export const AuthButton = ({ user, onLogin, onLogout }: AuthButtonProps) => {
     return (
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
-          {user.avatar ? (
-            <img src={user.avatar} alt={user.handle} className="w-8 h-8 rounded-full" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+          <Avatar className="w-8 h-8">
+            {user.avatar && <img src={user.avatar} alt={user.handle} />}
+            <AvatarFallback>
               <User className="w-4 h-4" />
-            </div>
-          )}
+            </AvatarFallback>
+          </Avatar>
           <span className="text-sm font-medium text-foreground">@{user.handle}</span>
         </div>
         <Button size="sm" variant="outline" onClick={onLogout}>
@@ -62,7 +67,7 @@ export const AuthButton = ({ user, onLogin, onLogout }: AuthButtonProps) => {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
           <LogIn className="w-4 h-4 mr-2" />
@@ -71,32 +76,33 @@ export const AuthButton = ({ user, onLogin, onLogout }: AuthButtonProps) => {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Login to ATProto</DialogTitle>
+          <DialogTitle>Login with OAuth</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="handle">Handle</Label>
+            <Label htmlFor="handle">Handle or DID</Label>
             <Input
               id="handle"
+              type="text"
               placeholder="your-handle.madebydanny.uk"
               value={handle}
               onChange={(e) => setHandle(e.target.value)}
-              required
+              disabled={isLoading}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">App Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="xxxx-xxxx-xxxx-xxxx"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+          
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Logging in..." : "Login"}
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Redirecting...
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4 mr-2" />
+                Sign in with OAuth
+              </>
+            )}
           </Button>
         </form>
       </DialogContent>
