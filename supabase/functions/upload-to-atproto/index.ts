@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
 
     if (useUserPds && userIdentifier && userPassword) {
       // User's PDS
-      pdsUrl = 'https://bsky.social';
+      pdsUrl = 'https://pds.madebydanny.uk';
       did = userIdentifier;
       console.log('Using user PDS for:', userIdentifier);
       accessToken = await createATProtoSession(userIdentifier, userPassword, pdsUrl);
