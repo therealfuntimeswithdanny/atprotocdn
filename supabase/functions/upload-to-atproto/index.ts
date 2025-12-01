@@ -168,6 +168,7 @@ Deno.serve(async (req) => {
         record: recordData.record,
         uri: recordData.uri,
         cid: recordData.cid,
+        did: did,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
