@@ -3,8 +3,6 @@ import { Cloud } from "lucide-react";
 import { UploadZone } from "@/components/UploadZone";
 import { UploadResult } from "@/components/UploadResult";
 import { AuthButton } from "@/components/AuthButton";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,6 +16,7 @@ interface UploadResponse {
     };
   };
   uri?: string;
+  did?: string;
   error?: string;
 }
 
@@ -31,7 +30,6 @@ const Index = () => {
   } | null>(null);
   const [user, setUser] = useState<{ handle: string; avatar?: string } | null>(null);
   const [userPassword, setUserPassword] = useState<string | null>(null);
-  const [useUserPds, setUseUserPds] = useState(false);
   const { toast } = useToast();
 
   const handleLogin = async (handle: string, password: string) => {
@@ -46,7 +44,6 @@ const Index = () => {
   const handleLogout = () => {
     setUser(null);
     setUserPassword(null);
-    setUseUserPds(false);
     toast({
       title: "Logged out",
       description: "You have been logged out",
@@ -60,6 +57,9 @@ const Index = () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      
+      // If logged in, use user's PDS; otherwise use altq.net
+      const useUserPds = !!user;
       formData.append('useUserPds', useUserPds.toString());
       
       if (useUserPds && user && userPassword) {
@@ -78,7 +78,7 @@ const Index = () => {
       }
 
       const imageUrl = URL.createObjectURL(file);
-      const did = useUserPds && user ? `did:plc:${user.handle}` : ATPROTO_DID;
+      const did = data.did || ATPROTO_DID;
       
       setUploadResult({
         imageUrl,
@@ -129,17 +129,16 @@ const Index = () => {
         </header>
 
         <main className="space-y-8">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <Switch
-              id="pds-toggle"
-              checked={useUserPds}
-              onCheckedChange={setUseUserPds}
-              disabled={!user}
-            />
-            <Label htmlFor="pds-toggle" className="text-foreground">
-              {useUserPds ? "Saving to your PDS" : "Saving to altq.net"}
-            </Label>
-          </div>
+          {user && (
+            <div className="text-center text-sm text-muted-foreground">
+              Saving to your PDS (@{user.handle})
+            </div>
+          )}
+          {!user && (
+            <div className="text-center text-sm text-muted-foreground">
+              Saving to altq.net (login to save to your PDS)
+            </div>
+          )}
           
           <UploadZone onFileSelect={handleFileSelect} isUploading={isUploading} />
           
@@ -156,7 +155,7 @@ const Index = () => {
         </main>
 
         <footer className="mt-16 text-center text-sm text-muted-foreground">
-          <p>Powered by ATProto • Storing on altq.net</p>
+          <p>Powered by ATProto • {user ? `Storing on ${user.handle}'s PDS` : 'Storing on altq.net'}</p>
         </footer>
       </div>
     </div>
