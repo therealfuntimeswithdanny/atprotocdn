@@ -78,7 +78,7 @@ export const AuthButton = ({ user, onLogin, onLogout }: AuthButtonProps) => {
             <Label htmlFor="handle">Handle</Label>
             <Input
               id="handle"
-              placeholder="your-handle.bsky.social"
+              placeholder="your-handle.madebydanny.uk"
               value={handle}
               onChange={(e) => setHandle(e.target.value)}
               required
