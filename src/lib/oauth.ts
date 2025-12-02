@@ -4,15 +4,16 @@ let oauthClient: BrowserOAuthClient | null = null;
 
 export const getOAuthClient = () => {
   if (!oauthClient) {
-    const redirectUri = 'https://danny-cdn-magic.lovable.app/';
-    const clientId = 'https://danny-cdn-magic.lovable.app/client-metadata.json';
+    const origin = window.location.origin;
+    const redirectUri = `${origin}/`;
+    const clientId = `${origin}/client-metadata.json`;
     
     oauthClient = new BrowserOAuthClient({
       handleResolver: 'https://pds.madebydanny.uk',
       clientMetadata: {
         client_id: clientId,
         client_name: 'ATProto CDN Tool',
-        client_uri: 'https://danny-cdn-magic.lovable.app',
+        client_uri: origin,
         redirect_uris: [redirectUri],
         scope: 'atproto transition:generic',
         response_types: ['code'],
