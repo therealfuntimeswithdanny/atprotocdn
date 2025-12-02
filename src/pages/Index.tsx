@@ -37,9 +37,26 @@ const Index = () => {
     const checkOAuthCallback = async () => {
       const result = await handleOAuthCallback();
       if (result) {
+        // Fetch user profile to get avatar
+        let avatar: string | undefined;
+        try {
+          const profileResponse = await fetch(
+            `https://pds.madebydanny.uk/xrpc/com.atproto.repo.getRecord?repo=${result.did}&collection=app.bsky.actor.profile&rkey=self`
+          );
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            if (profileData.value?.avatar?.ref?.$link) {
+              avatar = `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${result.did}&cid=${profileData.value.avatar.ref.$link}`;
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch profile:', error);
+        }
+
         setUser({
           handle: result.handle,
           did: result.did,
+          avatar,
         });
         toast({
           title: "Login successful",

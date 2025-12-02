@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogIn, LogOut, Loader2, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { initiateOAuthLogin } from "@/lib/oauth";
@@ -48,21 +49,25 @@ export const AuthButton = ({ user, onLogout }: AuthButtonProps) => {
 
   if (user) {
     return (
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Avatar className="w-8 h-8">
-            {user.avatar && <img src={user.avatar} alt={user.handle} />}
-            <AvatarFallback>
-              <User className="w-4 h-4" />
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-sm font-medium text-foreground">@{user.handle}</span>
-        </div>
-        <Button size="sm" variant="outline" onClick={onLogout}>
-          <LogOut className="w-4 h-4 mr-2" />
-          Logout
-        </Button>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="flex items-center gap-2 h-auto py-2 px-3">
+            <Avatar className="w-8 h-8">
+              {user.avatar && <AvatarImage src={user.avatar} alt={user.handle} />}
+              <AvatarFallback>
+                <User className="w-4 h-4" />
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium">@{user.handle}</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48 bg-background border border-border z-50">
+          <DropdownMenuItem onClick={onLogout} className="cursor-pointer">
+            <LogOut className="w-4 h-4 mr-2" />
+            Logout
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
