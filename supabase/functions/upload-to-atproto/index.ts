@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const ATPROTO_DID = 'did:plc:l37td5yhxl2irrzrgvei4qay';
-const ATPROTO_SERVICE = 'https://altq.net';
+const ATPROTO_SERVICE = 'https://pds.madebydanny.uk';
 
 interface BlobRef {
   $link: string;
