@@ -1,30 +1,20 @@
 import { BrowserOAuthClient } from '@atproto/oauth-client-browser';
 
-// For production, you'll need to host client metadata at a public URL
-// For now, using localhost development mode
-const getClientMetadata = () => {
-  const redirectUri = `${window.location.origin}/`;
-  
-  // In production, replace with your actual client_id URL
-  // Example: 'https://yourdomain.com/client-metadata.json'
-  return {
-    client_id: `http://localhost?redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent('atproto')}`,
-    redirect_uri: redirectUri,
-  };
-};
-
 let oauthClient: BrowserOAuthClient | null = null;
 
 export const getOAuthClient = () => {
   if (!oauthClient) {
     const redirectUri = `${window.location.origin}/`;
+    const clientId = `${window.location.origin}/client-metadata.json`;
     
     oauthClient = new BrowserOAuthClient({
       handleResolver: 'https://pds.madebydanny.uk',
       clientMetadata: {
-        client_id: `http://localhost?redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent('atproto')}`,
+        client_id: clientId,
+        client_name: 'ATProto CDN Tool',
+        client_uri: window.location.origin,
         redirect_uris: [redirectUri],
-        scope: 'atproto',
+        scope: 'atproto transition:generic',
         response_types: ['code'],
         grant_types: ['authorization_code', 'refresh_token'],
         token_endpoint_auth_method: 'none',
