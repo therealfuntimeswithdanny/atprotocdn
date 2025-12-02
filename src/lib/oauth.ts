@@ -22,6 +22,7 @@ export const getOAuthClient = () => {
         application_type: 'web',
         dpop_bound_access_tokens: true,
       },
+      responseMode: 'fragment', // Use fragment for hash-based redirects
     });
   }
   return oauthClient;
@@ -41,12 +42,15 @@ export const initiateOAuthLogin = async (handle: string) => {
 
 export const handleOAuthCallback = async () => {
   const client = getOAuthClient();
-  const params = new URLSearchParams(window.location.search);
+  
+  // Check for hash parameters (OAuth returns in fragment)
+  const hash = window.location.hash.slice(1); // Remove the # symbol
+  const hashParams = new URLSearchParams(hash);
   
   // Check if we're returning from OAuth flow
-  if (params.has('code') && params.has('state')) {
+  if (hashParams.has('code') && hashParams.has('state')) {
     try {
-      const result = await client.callback(params);
+      const result = await client.callback(hashParams);
       
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
