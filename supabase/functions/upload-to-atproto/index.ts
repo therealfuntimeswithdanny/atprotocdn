@@ -116,38 +116,23 @@ Deno.serve(async (req) => {
     
     const formData = await req.formData();
     const file = formData.get('file') as File;
-    const useUserPds = formData.get('useUserPds') === 'true';
-    const userAccessToken = formData.get('accessToken') as string | null;
-    const userDid = formData.get('userDid') as string | null;
     
     if (!file) {
       throw new Error('No file provided');
     }
 
     console.log('Processing file:', file.name, 'Type:', file.type, 'Size:', file.size);
-    console.log('Use user PDS:', useUserPds);
 
-    let accessToken: string;
-    let pdsUrl: string;
-    let did: string;
-
-    if (useUserPds && userAccessToken && userDid) {
-      // User's PDS with OAuth token
-      pdsUrl = 'https://pds.madebydanny.uk';
-      did = userDid;
-      accessToken = userAccessToken;
-      console.log('Using user PDS with OAuth for:', userDid);
-    } else {
-      // altq.net PDS
-      const password = Deno.env.get('ATPROTO_PASSWORD');
-      if (!password) {
-        throw new Error('ATPROTO_PASSWORD not configured');
-      }
-      pdsUrl = ATPROTO_SERVICE;
-      did = ATPROTO_DID;
-      console.log('Using altq.net PDS');
-      accessToken = await createATProtoSession(ATPROTO_DID, password, pdsUrl);
+    // This function is only used for anonymous uploads to altq.net
+    const password = Deno.env.get('ATPROTO_PASSWORD');
+    if (!password) {
+      throw new Error('ATPROTO_PASSWORD not configured');
     }
+    
+    const pdsUrl = ATPROTO_SERVICE;
+    const did = ATPROTO_DID;
+    console.log('Using altq.net PDS for anonymous upload');
+    const accessToken = await createATProtoSession(ATPROTO_DID, password, pdsUrl);
 
     // Read file data
     const arrayBuffer = await file.arrayBuffer();
