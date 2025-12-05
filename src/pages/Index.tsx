@@ -2,9 +2,20 @@ import { useState, useEffect } from "react";
 import { Cloud } from "lucide-react";
 import { UploadZone } from "@/components/UploadZone";
 import { UploadResult } from "@/components/UploadResult";
-import { AuthButton } from "@/components/AuthButton";
+import { AccountSwitcher } from "@/components/AccountSwitcher";
+import { UploadsHistory } from "@/components/UploadsHistory";
 import { useToast } from "@/hooks/use-toast";
-import { handleOAuthCallback, revokeOAuthSession, restorePersistedSession, uploadBlobWithOAuth } from "@/lib/oauth";
+import { 
+  handleOAuthCallback, 
+  revokeOAuthSession, 
+  restorePersistedSession, 
+  uploadBlobWithOAuth,
+  getStoredAccounts,
+  saveAccount,
+  setActiveAccountDid,
+  restoreSessionForDid,
+  StoredAccount
+} from "@/lib/oauth";
 
 const Index = () => {
   const [isUploading, setIsUploading] = useState(false);
@@ -14,11 +25,28 @@ const Index = () => {
     recordUri: string;
     did: string;
   } | null>(null);
-  const [user, setUser] = useState<{ handle: string; did: string; avatar?: string } | null>(null);
+  const [activeUser, setActiveUser] = useState<StoredAccount | null>(null);
+  const [accounts, setAccounts] = useState<StoredAccount[]>([]);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
+  const [uploadsKey, setUploadsKey] = useState(0);
   const { toast } = useToast();
 
-  const fetchUserProfile = async (did: string): Promise<string | undefined> => {
+  const fetchUserProfile = async (did: string): Promise<{ handle: string; avatar?: string }> => {
+    let handle = did;
+    let avatar: string | undefined;
+    
+    try {
+      const describeResponse = await fetch(
+        `https://pds.madebydanny.uk/xrpc/com.atproto.repo.describeRepo?repo=${did}`
+      );
+      if (describeResponse.ok) {
+        const describeData = await describeResponse.json();
+        handle = describeData.handle || did;
+      }
+    } catch (error) {
+      console.error('Failed to fetch handle:', error);
+    }
+    
     try {
       const profileResponse = await fetch(
         `https://pds.madebydanny.uk/xrpc/com.atproto.repo.getRecord?repo=${did}&collection=app.bsky.actor.profile&rkey=self`
@@ -26,54 +54,54 @@ const Index = () => {
       if (profileResponse.ok) {
         const profileData = await profileResponse.json();
         if (profileData.value?.avatar?.ref?.$link) {
-          return `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${profileData.value.avatar.ref.$link}`;
+          avatar = `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${profileData.value.avatar.ref.$link}`;
         }
       }
     } catch (error) {
       console.error('Failed to fetch profile:', error);
     }
-    return undefined;
+    
+    return { handle, avatar };
   };
 
   useEffect(() => {
     const initializeAuth = async () => {
+      // Load stored accounts
+      const storedAccounts = getStoredAccounts();
+      setAccounts(storedAccounts);
+      
+      // Check for OAuth callback
       const callbackResult = await handleOAuthCallback();
       if (callbackResult) {
-        const avatar = await fetchUserProfile(callbackResult.did);
-        setUser({
-          handle: callbackResult.handle,
+        const profile = await fetchUserProfile(callbackResult.did);
+        const account: StoredAccount = {
           did: callbackResult.did,
-          avatar,
-        });
+          handle: profile.handle,
+          avatar: profile.avatar,
+        };
+        saveAccount(account);
+        setActiveUser(account);
+        setAccounts(getStoredAccounts());
         toast({
           title: "Login successful",
-          description: `Logged in as @${callbackResult.handle}`,
+          description: `Logged in as @${profile.handle}`,
         });
         setIsRestoringSession(false);
         return;
       }
 
+      // Restore persisted session
       const restoredSession = await restorePersistedSession();
       if (restoredSession) {
-        const avatar = await fetchUserProfile(restoredSession.did);
-        let handle = restoredSession.did;
-        try {
-          const describeResponse = await fetch(
-            `https://pds.madebydanny.uk/xrpc/com.atproto.repo.describeRepo?repo=${restoredSession.did}`
-          );
-          if (describeResponse.ok) {
-            const describeData = await describeResponse.json();
-            handle = describeData.handle || restoredSession.did;
-          }
-        } catch (error) {
-          console.error('Failed to fetch handle:', error);
-        }
-        
-        setUser({
-          handle,
+        const profile = await fetchUserProfile(restoredSession.did);
+        const account: StoredAccount = {
           did: restoredSession.did,
-          avatar,
-        });
+          handle: profile.handle,
+          avatar: profile.avatar,
+        };
+        saveAccount(account);
+        setActiveUser(account);
+        setAccounts(getStoredAccounts());
       }
       
       setIsRestoringSession(false);
@@ -82,34 +110,69 @@ const Index = () => {
     initializeAuth();
   }, [toast]);
 
-  const handleLogout = async () => {
-    if (user) {
-      await revokeOAuthSession(user.did);
-      setUser(null);
-      setUploadResult(null);
+  const handleSwitchAccount = async (did: string) => {
+    const session = await restoreSessionForDid(did);
+    if (session) {
+      setActiveAccountDid(did);
+      const storedAccounts = getStoredAccounts();
+      const account = storedAccounts.find(a => a.did === did);
+      if (account) {
+        setActiveUser(account);
+        setUploadResult(null);
+        setUploadsKey(prev => prev + 1);
+        toast({
+          title: "Switched account",
+          description: `Now using @${account.handle}`,
+        });
+      }
+    } else {
       toast({
-        title: "Logged out",
-        description: "You have been logged out",
+        title: "Session expired",
+        description: "Please sign in again",
+        variant: "destructive",
       });
+      setAccounts(getStoredAccounts());
     }
   };
 
+  const handleLogout = async (did: string) => {
+    await revokeOAuthSession(did);
+    const remainingAccounts = getStoredAccounts();
+    setAccounts(remainingAccounts);
+    
+    if (activeUser?.did === did) {
+      if (remainingAccounts.length > 0) {
+        await handleSwitchAccount(remainingAccounts[0].did);
+      } else {
+        setActiveUser(null);
+        setUploadResult(null);
+      }
+    }
+    
+    toast({
+      title: "Logged out",
+      description: "Account removed",
+    });
+  };
+
   const handleFileSelect = async (file: File) => {
-    if (!user) return;
+    if (!activeUser) return;
     
     setIsUploading(true);
     setUploadResult(null);
 
     try {
-      const result = await uploadBlobWithOAuth(user.did, file);
+      const result = await uploadBlobWithOAuth(activeUser.did, file);
       const imageUrl = URL.createObjectURL(file);
       
       setUploadResult({
         imageUrl,
         blobCid: result.blob.ref.$link,
         recordUri: result.uri,
-        did: user.did,
+        did: activeUser.did,
       });
+      
+      setUploadsKey(prev => prev + 1);
 
       toast({
         title: "Upload successful",
@@ -131,7 +194,12 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <div className="container max-w-4xl mx-auto px-4 py-12">
         <div className="absolute top-4 right-4">
-          <AuthButton user={user} onLogout={handleLogout} />
+          <AccountSwitcher 
+            activeUser={activeUser}
+            accounts={accounts}
+            onSwitchAccount={handleSwitchAccount}
+            onLogout={handleLogout}
+          />
         </div>
         
         <header className="text-center mb-12">
@@ -157,10 +225,10 @@ const Index = () => {
             <div className="text-center text-sm text-muted-foreground">
               Restoring session...
             </div>
-          ) : user ? (
+          ) : activeUser ? (
             <>
               <div className="text-center text-sm text-muted-foreground">
-                Saving to your PDS (@{user.handle})
+                Saving to your PDS (@{activeUser.handle})
               </div>
               <UploadZone onFileSelect={handleFileSelect} isUploading={isUploading} />
             </>
@@ -179,6 +247,10 @@ const Index = () => {
                 did={uploadResult.did}
               />
             </div>
+          )}
+          
+          {activeUser && (
+            <UploadsHistory key={uploadsKey} did={activeUser.did} />
           )}
         </main>
 

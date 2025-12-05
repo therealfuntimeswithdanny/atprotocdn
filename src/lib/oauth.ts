@@ -1,6 +1,13 @@
 import { BrowserOAuthClient } from '@atproto/oauth-client-browser';
 
-const SESSION_STORAGE_KEY = 'atproto-user-did';
+const ACCOUNTS_STORAGE_KEY = 'atproto-accounts';
+const ACTIVE_ACCOUNT_KEY = 'atproto-active-did';
+
+export interface StoredAccount {
+  did: string;
+  handle: string;
+  avatar?: string;
+}
 
 let oauthClient: BrowserOAuthClient | null = null;
 
@@ -30,6 +37,41 @@ export const getOAuthClient = () => {
   return oauthClient;
 };
 
+// Multi-account storage helpers
+export const getStoredAccounts = (): StoredAccount[] => {
+  const stored = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+  return stored ? JSON.parse(stored) : [];
+};
+
+export const saveAccount = (account: StoredAccount) => {
+  const accounts = getStoredAccounts();
+  const existingIndex = accounts.findIndex(a => a.did === account.did);
+  if (existingIndex >= 0) {
+    accounts[existingIndex] = account;
+  } else {
+    accounts.push(account);
+  }
+  localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+};
+
+export const removeAccount = (did: string) => {
+  const accounts = getStoredAccounts().filter(a => a.did !== did);
+  localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+  
+  const activeDid = localStorage.getItem(ACTIVE_ACCOUNT_KEY);
+  if (activeDid === did) {
+    localStorage.setItem(ACTIVE_ACCOUNT_KEY, accounts[0]?.did || '');
+  }
+};
+
+export const getActiveAccountDid = (): string | null => {
+  return localStorage.getItem(ACTIVE_ACCOUNT_KEY) || null;
+};
+
+export const setActiveAccountDid = (did: string) => {
+  localStorage.setItem(ACTIVE_ACCOUNT_KEY, did);
+};
+
 export const initiateOAuthLogin = async (handle: string) => {
   const client = getOAuthClient();
   sessionStorage.setItem('oauth-login-handle', handle);
@@ -50,13 +92,14 @@ export const handleOAuthCallback = async () => {
       window.history.replaceState({}, document.title, window.location.pathname);
       
       const storedHandle = sessionStorage.getItem('oauth-login-handle');
+      const handle = storedHandle || result.session.did;
       
-      // Persist the DID for session restoration
-      localStorage.setItem(SESSION_STORAGE_KEY, result.session.did);
+      // Set as active and save to accounts
+      setActiveAccountDid(result.session.did);
       
       return {
         did: result.session.did,
-        handle: storedHandle || result.session.did,
+        handle,
         session: result.session,
       };
     } catch (error) {
@@ -71,12 +114,12 @@ export const handleOAuthCallback = async () => {
 };
 
 export const restorePersistedSession = async () => {
-  const storedDid = localStorage.getItem(SESSION_STORAGE_KEY);
-  if (!storedDid) return null;
+  const activeDid = getActiveAccountDid();
+  if (!activeDid) return null;
   
   try {
     const client = getOAuthClient();
-    const session = await client.restore(storedDid);
+    const session = await client.restore(activeDid);
     if (session) {
       return {
         did: session.did,
@@ -85,10 +128,21 @@ export const restorePersistedSession = async () => {
     }
   } catch (error) {
     console.error('Failed to restore persisted session:', error);
-    // Clear invalid session
-    localStorage.removeItem(SESSION_STORAGE_KEY);
+    removeAccount(activeDid);
   }
   return null;
+};
+
+export const restoreSessionForDid = async (did: string) => {
+  try {
+    const client = getOAuthClient();
+    const session = await client.restore(did);
+    return session;
+  } catch (error) {
+    console.error('Failed to restore session for DID:', did, error);
+    removeAccount(did);
+    return null;
+  }
 };
 
 export const revokeOAuthSession = async (did: string) => {
@@ -98,8 +152,7 @@ export const revokeOAuthSession = async (did: string) => {
   } catch (error) {
     console.error('Failed to revoke session:', error);
   }
-  // Clear persisted session
-  localStorage.removeItem(SESSION_STORAGE_KEY);
+  removeAccount(did);
 };
 
 // Upload blob using OAuth session directly (for authenticated users)
@@ -114,10 +167,8 @@ export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
     throw new Error('No active session');
   }
 
-  // Get the user's PDS URL from the DID document
-  const pdsUrl = 'https://pds.madebydanny.uk'; // Default for now
+  const pdsUrl = 'https://pds.madebydanny.uk';
   
-  // Upload blob using the session's fetch (handles DPoP automatically)
   const arrayBuffer = await file.arrayBuffer();
   const fileData = new Uint8Array(arrayBuffer);
   
@@ -136,7 +187,6 @@ export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
   
   const blobData = await blobResponse.json();
   
-  // Create record
   const record = {
     blob: blobData.blob,
     $type: 'uk.madebydanny.cdn.img',
@@ -167,4 +217,32 @@ export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
     blob: blobData.blob,
     uri: recordData.uri,
   };
+};
+
+// Fetch all uploads for a user
+export const fetchUserUploads = async (did: string): Promise<{
+  cid: string;
+  uri: string;
+  mimeType: string;
+  createdAt: string;
+}[]> => {
+  try {
+    const response = await fetch(
+      `https://pds.madebydanny.uk/xrpc/com.atproto.repo.listRecords?repo=${did}&collection=uk.madebydanny.cdn.img&limit=100`
+    );
+    
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    
+    return data.records.map((record: any) => ({
+      cid: record.value.blob?.ref?.$link || '',
+      uri: record.uri,
+      mimeType: record.value.blob?.mimeType || 'image/jpeg',
+      createdAt: record.value.createdAt || new Date().toISOString(),
+    }));
+  } catch (error) {
+    console.error('Failed to fetch uploads:', error);
+    return [];
+  }
 };
