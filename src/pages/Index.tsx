@@ -5,7 +5,7 @@ import { UploadResult } from "@/components/UploadResult";
 import { AuthButton } from "@/components/AuthButton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { handleOAuthCallback, revokeOAuthSession, getAccessToken } from "@/lib/oauth";
+import { handleOAuthCallback, revokeOAuthSession, restorePersistedSession, uploadBlobWithOAuth } from "@/lib/oauth";
 
 const ATPROTO_DID = 'did:plc:l37td5yhxl2irrzrgvei4qay';
 
@@ -30,42 +30,75 @@ const Index = () => {
     did: string;
   } | null>(null);
   const [user, setUser] = useState<{ handle: string; did: string; avatar?: string } | null>(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const { toast } = useToast();
 
-  // Handle OAuth callback on page load
-  useEffect(() => {
-    const checkOAuthCallback = async () => {
-      const result = await handleOAuthCallback();
-      if (result) {
-        // Fetch user profile to get avatar
-        let avatar: string | undefined;
-        try {
-          const profileResponse = await fetch(
-            `https://pds.madebydanny.uk/xrpc/com.atproto.repo.getRecord?repo=${result.did}&collection=app.bsky.actor.profile&rkey=self`
-          );
-          if (profileResponse.ok) {
-            const profileData = await profileResponse.json();
-            if (profileData.value?.avatar?.ref?.$link) {
-              avatar = `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${result.did}&cid=${profileData.value.avatar.ref.$link}`;
-            }
-          }
-        } catch (error) {
-          console.error('Failed to fetch profile:', error);
+  const fetchUserProfile = async (did: string): Promise<string | undefined> => {
+    try {
+      const profileResponse = await fetch(
+        `https://pds.madebydanny.uk/xrpc/com.atproto.repo.getRecord?repo=${did}&collection=app.bsky.actor.profile&rkey=self`
+      );
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        if (profileData.value?.avatar?.ref?.$link) {
+          return `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${profileData.value.avatar.ref.$link}`;
         }
+      }
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+    }
+    return undefined;
+  };
 
+  // Handle OAuth callback and session restoration on page load
+  useEffect(() => {
+    const initializeAuth = async () => {
+      // First check for OAuth callback
+      const callbackResult = await handleOAuthCallback();
+      if (callbackResult) {
+        const avatar = await fetchUserProfile(callbackResult.did);
         setUser({
-          handle: result.handle,
-          did: result.did,
+          handle: callbackResult.handle,
+          did: callbackResult.did,
           avatar,
         });
         toast({
           title: "Login successful",
-          description: `Logged in as @${result.handle}`,
+          description: `Logged in as @${callbackResult.handle}`,
+        });
+        setIsRestoringSession(false);
+        return;
+      }
+
+      // Try to restore persisted session
+      const restoredSession = await restorePersistedSession();
+      if (restoredSession) {
+        const avatar = await fetchUserProfile(restoredSession.did);
+        // Try to get handle from profile or use DID
+        let handle = restoredSession.did;
+        try {
+          const describeResponse = await fetch(
+            `https://pds.madebydanny.uk/xrpc/com.atproto.repo.describeRepo?repo=${restoredSession.did}`
+          );
+          if (describeResponse.ok) {
+            const describeData = await describeResponse.json();
+            handle = describeData.handle || restoredSession.did;
+          }
+        } catch (error) {
+          console.error('Failed to fetch handle:', error);
+        }
+        
+        setUser({
+          handle,
+          did: restoredSession.did,
+          avatar,
         });
       }
+      
+      setIsRestoringSession(false);
     };
     
-    checkOAuthCallback();
+    initializeAuth();
   }, [toast]);
 
   const handleLogout = async () => {
@@ -84,39 +117,43 @@ const Index = () => {
     setUploadResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // If logged in, use user's PDS with OAuth token; otherwise use altq.net
-      const useUserPds = !!user;
-      formData.append('useUserPds', useUserPds.toString());
-      
-      if (useUserPds && user) {
-        const accessToken = await getAccessToken(user.did);
-        if (!accessToken) {
-          throw new Error('Failed to get access token');
+      let blobData: { ref: { $link: string } };
+      let uri: string;
+      let did: string;
+
+      if (user) {
+        // Use OAuth session for authenticated users (direct browser upload)
+        const result = await uploadBlobWithOAuth(user.did, file);
+        blobData = result.blob;
+        uri = result.uri;
+        did = user.did;
+      } else {
+        // Use edge function for anonymous uploads to altq.net
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('useUserPds', 'false');
+
+        const { data, error } = await supabase.functions.invoke<UploadResponse>('upload-to-atproto', {
+          body: formData,
+        });
+
+        if (error) throw error;
+
+        if (!data?.success || !data.blob || !data.uri) {
+          throw new Error(data?.error || 'Upload failed');
         }
-        formData.append('accessToken', accessToken);
-        formData.append('userDid', user.did);
-      }
 
-      const { data, error } = await supabase.functions.invoke<UploadResponse>('upload-to-atproto', {
-        body: formData,
-      });
-
-      if (error) throw error;
-
-      if (!data?.success || !data.blob || !data.uri) {
-        throw new Error(data?.error || 'Upload failed');
+        blobData = data.blob;
+        uri = data.uri;
+        did = data.did || ATPROTO_DID;
       }
 
       const imageUrl = URL.createObjectURL(file);
-      const did = data.did || ATPROTO_DID;
       
       setUploadResult({
         imageUrl,
-        blobCid: data.blob.ref.$link,
-        recordUri: data.uri,
+        blobCid: blobData.ref.$link,
+        recordUri: uri,
         did,
       });
 
@@ -162,12 +199,15 @@ const Index = () => {
         </header>
 
         <main className="space-y-8">
-          {user && (
+          {isRestoringSession ? (
+            <div className="text-center text-sm text-muted-foreground">
+              Restoring session...
+            </div>
+          ) : user ? (
             <div className="text-center text-sm text-muted-foreground">
               Saving to your PDS (@{user.handle})
             </div>
-          )}
-          {!user && (
+          ) : (
             <div className="text-center text-sm text-muted-foreground">
               Saving to altq.net (login to save to your PDS)
             </div>
