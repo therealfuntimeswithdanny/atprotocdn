@@ -4,22 +4,7 @@ import { UploadZone } from "@/components/UploadZone";
 import { UploadResult } from "@/components/UploadResult";
 import { AuthButton } from "@/components/AuthButton";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { handleOAuthCallback, revokeOAuthSession, restorePersistedSession, uploadBlobWithOAuth } from "@/lib/oauth";
-
-const ATPROTO_DID = 'did:plc:l37td5yhxl2irrzrgvei4qay';
-
-interface UploadResponse {
-  success: boolean;
-  blob?: {
-    ref: {
-      $link: string;
-    };
-  };
-  uri?: string;
-  did?: string;
-  error?: string;
-}
 
 const Index = () => {
   const [isUploading, setIsUploading] = useState(false);
@@ -50,10 +35,8 @@ const Index = () => {
     return undefined;
   };
 
-  // Handle OAuth callback and session restoration on page load
   useEffect(() => {
     const initializeAuth = async () => {
-      // First check for OAuth callback
       const callbackResult = await handleOAuthCallback();
       if (callbackResult) {
         const avatar = await fetchUserProfile(callbackResult.did);
@@ -70,11 +53,9 @@ const Index = () => {
         return;
       }
 
-      // Try to restore persisted session
       const restoredSession = await restorePersistedSession();
       if (restoredSession) {
         const avatar = await fetchUserProfile(restoredSession.did);
-        // Try to get handle from profile or use DID
         let handle = restoredSession.did;
         try {
           const describeResponse = await fetch(
@@ -105,6 +86,7 @@ const Index = () => {
     if (user) {
       await revokeOAuthSession(user.did);
       setUser(null);
+      setUploadResult(null);
       toast({
         title: "Logged out",
         description: "You have been logged out",
@@ -113,48 +95,20 @@ const Index = () => {
   };
 
   const handleFileSelect = async (file: File) => {
+    if (!user) return;
+    
     setIsUploading(true);
     setUploadResult(null);
 
     try {
-      let blobData: { ref: { $link: string } };
-      let uri: string;
-      let did: string;
-
-      if (user) {
-        // Use OAuth session for authenticated users (direct browser upload)
-        const result = await uploadBlobWithOAuth(user.did, file);
-        blobData = result.blob;
-        uri = result.uri;
-        did = user.did;
-      } else {
-        // Use edge function for anonymous uploads to altq.net
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('useUserPds', 'false');
-
-        const { data, error } = await supabase.functions.invoke<UploadResponse>('upload-to-atproto', {
-          body: formData,
-        });
-
-        if (error) throw error;
-
-        if (!data?.success || !data.blob || !data.uri) {
-          throw new Error(data?.error || 'Upload failed');
-        }
-
-        blobData = data.blob;
-        uri = data.uri;
-        did = data.did || ATPROTO_DID;
-      }
-
+      const result = await uploadBlobWithOAuth(user.did, file);
       const imageUrl = URL.createObjectURL(file);
       
       setUploadResult({
         imageUrl,
-        blobCid: blobData.ref.$link,
-        recordUri: uri,
-        did,
+        blobCid: result.blob.ref.$link,
+        recordUri: result.uri,
+        did: user.did,
       });
 
       toast({
@@ -204,16 +158,17 @@ const Index = () => {
               Restoring session...
             </div>
           ) : user ? (
-            <div className="text-center text-sm text-muted-foreground">
-              Saving to your PDS (@{user.handle})
-            </div>
+            <>
+              <div className="text-center text-sm text-muted-foreground">
+                Saving to your PDS (@{user.handle})
+              </div>
+              <UploadZone onFileSelect={handleFileSelect} isUploading={isUploading} />
+            </>
           ) : (
-            <div className="text-center text-sm text-muted-foreground">
-              Saving to altq.net (login to save to your PDS)
+            <div className="text-center py-12 space-y-4">
+              <p className="text-muted-foreground">Sign in to upload images to your PDS</p>
             </div>
           )}
-          
-          <UploadZone onFileSelect={handleFileSelect} isUploading={isUploading} />
           
           {uploadResult && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -228,7 +183,7 @@ const Index = () => {
         </main>
 
         <footer className="mt-16 text-center text-sm text-muted-foreground">
-          <p>Powered by ATProto • {user ? `Storing on ${user.handle}'s PDS` : 'Storing on altq.net'}</p>
+          <p>Powered by ATProto</p>
         </footer>
       </div>
     </div>
