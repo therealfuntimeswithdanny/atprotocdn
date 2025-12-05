@@ -11,11 +11,9 @@ interface UploadResultProps {
 }
 
 export const UploadResult = ({ imageUrl, blobCid, recordUri, did }: UploadResultProps) => {
-  const [copiedCid, setCopiedCid] = useState(false);
-  const [copiedUri, setCopiedUri] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
-  const blobUrl = `https://altq.net/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${blobCid}`;
+  const blobUrl = `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${blobCid}`;
 
   const copyToClipboard = async (text: string, setCopied: (value: boolean) => void) => {
     await navigator.clipboard.writeText(text);
@@ -37,10 +35,9 @@ export const UploadResult = ({ imageUrl, blobCid, recordUri, did }: UploadResult
         </div>
 
         <div className="space-y-4">
-
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              Blob URL
+              Image URL
             </label>
             <div className="flex gap-2">
               <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm font-mono break-all text-foreground">
@@ -61,64 +58,18 @@ export const UploadResult = ({ imageUrl, blobCid, recordUri, did }: UploadResult
             </div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              Blob CID
-            </label>
-            <div className="flex gap-2">
-              <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm font-mono break-all text-foreground">
-                {blobCid}
-              </code>
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={() => copyToClipboard(blobCid, setCopiedCid)}
-                className="shrink-0"
-              >
-                {copiedCid ? (
-                  <Check className="w-4 h-4 text-accent" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              Record URI
-            </label>
-            <div className="flex gap-2">
-              <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm font-mono break-all text-foreground">
-                {recordUri}
-              </code>
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={() => copyToClipboard(recordUri, setCopiedUri)}
-                className="shrink-0"
-              >
-                {copiedUri ? (
-                  <Check className="w-4 h-4 text-accent" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-
           <Button
             variant="outline"
             className="w-full"
             asChild
           >
             <a 
-              href={`https://altq.net/profile/${recordUri.split('/')[2]}`}
+              href={blobUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2"
             >
-              View on ATProto
+              View Image
               <ExternalLink className="w-4 h-4" />
             </a>
           </Button>
