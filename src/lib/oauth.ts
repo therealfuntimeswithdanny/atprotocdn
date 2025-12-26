@@ -1,4 +1,5 @@
 import { BrowserOAuthClient } from '@atproto/oauth-client-browser';
+import { supabase } from '@/integrations/supabase/client';
 
 const ACCOUNTS_STORAGE_KEY = 'atproto-accounts';
 const ACTIVE_ACCOUNT_KEY = 'atproto-active-did';
@@ -159,6 +160,7 @@ export const revokeOAuthSession = async (did: string) => {
 export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
   blob: { ref: { $link: string }; mimeType: string; size: number };
   uri: string;
+  uploadId: string;
 }> => {
   const client = getOAuthClient();
   const session = await client.restore(did);
@@ -213,33 +215,55 @@ export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
   
   const recordData = await recordResponse.json();
   
+  // Track upload in Supabase
+  const { data: uploadData, error: uploadError } = await supabase
+    .from('uploads')
+    .insert({
+      user_did: did,
+      blob_cid: blobData.blob.ref.$link,
+      mime_type: file.type,
+      size_bytes: file.size,
+      filename: file.name,
+    })
+    .select('id')
+    .single();
+    
+  if (uploadError) {
+    console.error('Failed to track upload:', uploadError);
+  }
+  
   return {
     blob: blobData.blob,
     uri: recordData.uri,
+    uploadId: uploadData?.id || '',
   };
 };
 
 // Fetch all uploads for a user
 export const fetchUserUploads = async (did: string): Promise<{
+  id: string;
   cid: string;
   uri: string;
   mimeType: string;
   createdAt: string;
+  filename: string | null;
 }[]> => {
   try {
-    const response = await fetch(
-      `https://pds.madebydanny.uk/xrpc/com.atproto.repo.listRecords?repo=${did}&collection=uk.madebydanny.cdn.img&limit=100`
-    );
+    const { data, error } = await supabase
+      .from('uploads')
+      .select('*')
+      .eq('user_did', did)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
     
-    if (!response.ok) return [];
-    
-    const data = await response.json();
-    
-    return data.records.map((record: any) => ({
-      cid: record.value.blob?.ref?.$link || '',
-      uri: record.uri,
-      mimeType: record.value.blob?.mimeType || 'image/jpeg',
-      createdAt: record.value.createdAt || new Date().toISOString(),
+    return (data || []).map((upload) => ({
+      id: upload.id,
+      cid: upload.blob_cid,
+      uri: '',
+      mimeType: upload.mime_type,
+      createdAt: upload.created_at,
+      filename: upload.filename,
     }));
   } catch (error) {
     console.error('Failed to fetch uploads:', error);

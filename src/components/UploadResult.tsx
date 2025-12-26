@@ -1,19 +1,23 @@
 import { useState } from "react";
-import { Check, Copy, ExternalLink } from "lucide-react";
+import { Check, Copy, ExternalLink, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Link } from "react-router-dom";
 
 interface UploadResultProps {
   imageUrl: string;
   blobCid: string;
   recordUri: string;
   did: string;
+  uploadId?: string;
 }
 
-export const UploadResult = ({ imageUrl, blobCid, recordUri, did }: UploadResultProps) => {
+export const UploadResult = ({ imageUrl, blobCid, recordUri, did, uploadId }: UploadResultProps) => {
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedShare, setCopiedShare] = useState(false);
 
   const blobUrl = `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${blobCid}`;
+  const shareUrl = uploadId ? `${window.location.origin}/i/${uploadId}` : '';
 
   const copyToClipboard = async (text: string, setCopied: (value: boolean) => void) => {
     await navigator.clipboard.writeText(text);
@@ -37,7 +41,7 @@ export const UploadResult = ({ imageUrl, blobCid, recordUri, did }: UploadResult
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              Image URL
+              Direct Image URL
             </label>
             <div className="flex gap-2">
               <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm font-mono break-all text-foreground">
@@ -58,21 +62,63 @@ export const UploadResult = ({ imageUrl, blobCid, recordUri, did }: UploadResult
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            className="w-full"
-            asChild
-          >
-            <a 
-              href={blobUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2"
+          {uploadId && (
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Share Link
+              </label>
+              <div className="flex gap-2">
+                <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm font-mono break-all text-foreground">
+                  {shareUrl}
+                </code>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => copyToClipboard(shareUrl, setCopiedShare)}
+                  className="shrink-0"
+                >
+                  {copiedShare ? (
+                    <Check className="w-4 h-4 text-accent" />
+                  ) : (
+                    <Share2 className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              asChild
             >
-              View Image
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </Button>
+              <a 
+                href={blobUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2"
+              >
+                View Image
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </Button>
+            {uploadId && (
+              <Button
+                variant="outline"
+                className="flex-1"
+                asChild
+              >
+                <Link 
+                  to={`/i/${uploadId}`}
+                  className="flex items-center justify-center gap-2"
+                >
+                  Share Page
+                  <Share2 className="w-4 h-4" />
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </Card>

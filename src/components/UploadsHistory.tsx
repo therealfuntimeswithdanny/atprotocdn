@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
-import { Copy, Check, ExternalLink, RefreshCw } from "lucide-react";
+import { Copy, Check, ExternalLink, RefreshCw, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import { fetchUserUploads } from "@/lib/oauth";
 
 interface Upload {
+  id: string;
   cid: string;
   uri: string;
   mimeType: string;
   createdAt: string;
+  filename: string | null;
 }
 
 interface UploadsHistoryProps {
@@ -17,7 +20,7 @@ interface UploadsHistoryProps {
 export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [copiedCid, setCopiedCid] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const loadUploads = async () => {
     setIsLoading(true);
@@ -34,11 +37,18 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
     return `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${cid}`;
   };
 
-  const handleCopy = async (cid: string) => {
-    const url = getBlobUrl(cid);
+  const getShareUrl = (id: string) => {
+    return `${window.location.origin}/i/${id}`;
+  };
+
+  const handleCopy = async (id: string, type: 'blob' | 'share') => {
+    const upload = uploads.find(u => u.id === id);
+    if (!upload) return;
+    
+    const url = type === 'blob' ? getBlobUrl(upload.cid) : getShareUrl(id);
     await navigator.clipboard.writeText(url);
-    setCopiedCid(cid);
-    setTimeout(() => setCopiedCid(null), 2000);
+    setCopiedId(`${id}-${type}`);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   if (isLoading) {
@@ -66,25 +76,38 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {uploads.map((upload) => (
-            <div key={upload.cid} className="group relative">
-              <div className="aspect-square rounded-lg overflow-hidden bg-muted border border-border">
-                <img
-                  src={getBlobUrl(upload.cid)}
-                  alt="Upload"
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </div>
-              <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-lg">
+            <div key={upload.id} className="group relative">
+              <Link to={`/i/${upload.id}`}>
+                <div className="aspect-square rounded-lg overflow-hidden bg-muted border border-border">
+                  <img
+                    src={getBlobUrl(upload.cid)}
+                    alt={upload.filename || "Upload"}
+                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                    loading="lazy"
+                  />
+                </div>
+              </Link>
+              <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-lg pointer-events-none group-hover:pointer-events-auto">
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={() => handleCopy(upload.cid)}
+                  onClick={() => handleCopy(upload.id, 'blob')}
                 >
-                  {copiedCid === upload.cid ? (
+                  {copiedId === `${upload.id}-blob` ? (
                     <Check className="w-4 h-4" />
                   ) : (
                     <Copy className="w-4 h-4" />
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleCopy(upload.id, 'share')}
+                >
+                  {copiedId === `${upload.id}-share` ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Share2 className="w-4 h-4" />
                   )}
                 </Button>
                 <Button
@@ -98,7 +121,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
                 </Button>
               </div>
               <div className="mt-1 text-xs text-muted-foreground truncate">
-                {new Date(upload.createdAt).toLocaleDateString()}
+                {upload.filename || new Date(upload.createdAt).toLocaleDateString()}
               </div>
             </div>
           ))}
