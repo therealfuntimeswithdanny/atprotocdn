@@ -4,6 +4,8 @@ import { UploadZone } from "@/components/UploadZone";
 import { UploadResult } from "@/components/UploadResult";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { UploadsHistory } from "@/components/UploadsHistory";
+import { UploadStats } from "@/components/UploadStats";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import { 
   handleOAuthCallback, 
@@ -24,6 +26,7 @@ const Index = () => {
     blobCid: string;
     recordUri: string;
     did: string;
+    uploadId: string;
   } | null>(null);
   const [activeUser, setActiveUser] = useState<StoredAccount | null>(null);
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
@@ -170,6 +173,7 @@ const Index = () => {
         blobCid: result.blob.ref.$link,
         recordUri: result.uri,
         did: activeUser.did,
+        uploadId: result.uploadId,
       });
       
       setUploadsKey(prev => prev + 1);
@@ -193,7 +197,8 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-4xl mx-auto px-4 py-12">
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <ThemeToggle />
           <AccountSwitcher 
             activeUser={activeUser}
             accounts={accounts}
@@ -250,7 +255,10 @@ const Index = () => {
           )}
           
           {activeUser && (
-            <UploadsHistory key={uploadsKey} did={activeUser.did} />
+            <>
+              <UploadStats did={activeUser.did} refreshKey={uploadsKey} />
+              <UploadsHistory key={uploadsKey} did={activeUser.did} />
+            </>
           )}
         </main>
 
