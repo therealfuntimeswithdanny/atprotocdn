@@ -239,32 +239,136 @@ export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
   };
 };
 
-// Fetch all uploads for a user
-export const fetchUserUploads = async (did: string): Promise<{
+// Upload multiple blobs with progress callback
+export const uploadMultipleBlobsWithOAuth = async (
+  did: string, 
+  files: File[],
+  onProgress: (index: number, status: 'uploading' | 'completed' | 'failed', error?: string) => void
+): Promise<{ successCount: number; failedCount: number }> => {
+  let successCount = 0;
+  let failedCount = 0;
+
+  for (let i = 0; i < files.length; i++) {
+    onProgress(i, 'uploading');
+    try {
+      await uploadBlobWithOAuth(did, files[i]);
+      successCount++;
+      onProgress(i, 'completed');
+    } catch (error) {
+      failedCount++;
+      onProgress(i, 'failed', error instanceof Error ? error.message : 'Upload failed');
+    }
+  }
+
+  return { successCount, failedCount };
+};
+
+export interface UploadFiltersParams {
+  search?: string;
+  dateRange?: 'all' | 'today' | 'week' | 'month';
+  mimeType?: string;
+  sizeRange?: 'all' | 'small' | 'medium' | 'large';
+  sortBy?: 'date' | 'size' | 'name';
+  sortOrder?: 'asc' | 'desc';
+}
+
+// Fetch all uploads for a user with filtering
+export const fetchUserUploads = async (did: string, filters?: UploadFiltersParams): Promise<{
   id: string;
   cid: string;
   uri: string;
   mimeType: string;
   createdAt: string;
   filename: string | null;
+  sizeBytes: number;
 }[]> => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('uploads')
       .select('*')
-      .eq('user_did', did)
-      .order('created_at', { ascending: false });
+      .eq('user_did', did);
+    
+    // Apply date range filter
+    if (filters?.dateRange && filters.dateRange !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      
+      switch (filters.dateRange) {
+        case 'today':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'month':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(0);
+      }
+      
+      query = query.gte('created_at', startDate.toISOString());
+    }
+    
+    // Apply mime type filter
+    if (filters?.mimeType && filters.mimeType !== 'all') {
+      query = query.eq('mime_type', filters.mimeType);
+    }
+    
+    // Apply size range filter
+    if (filters?.sizeRange && filters.sizeRange !== 'all') {
+      switch (filters.sizeRange) {
+        case 'small':
+          query = query.lt('size_bytes', 100 * 1024);
+          break;
+        case 'medium':
+          query = query.gte('size_bytes', 100 * 1024).lt('size_bytes', 1024 * 1024);
+          break;
+        case 'large':
+          query = query.gte('size_bytes', 1024 * 1024);
+          break;
+      }
+    }
+    
+    // Apply sorting
+    const sortBy = filters?.sortBy || 'date';
+    const sortOrder = filters?.sortOrder || 'desc';
+    const ascending = sortOrder === 'asc';
+    
+    switch (sortBy) {
+      case 'size':
+        query = query.order('size_bytes', { ascending });
+        break;
+      case 'name':
+        query = query.order('filename', { ascending, nullsFirst: false });
+        break;
+      default:
+        query = query.order('created_at', { ascending });
+    }
+    
+    const { data, error } = await query;
       
     if (error) throw error;
     
-    return (data || []).map((upload) => ({
+    let results = (data || []).map((upload) => ({
       id: upload.id,
       cid: upload.blob_cid,
       uri: '',
       mimeType: upload.mime_type,
       createdAt: upload.created_at,
       filename: upload.filename,
+      sizeBytes: upload.size_bytes,
     }));
+    
+    // Apply search filter (client-side for partial matching)
+    if (filters?.search) {
+      const searchLower = filters.search.toLowerCase();
+      results = results.filter(upload => 
+        upload.filename?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return results;
   } catch (error) {
     console.error('Failed to fetch uploads:', error);
     return [];

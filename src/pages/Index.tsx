@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Cloud } from "lucide-react";
-import { UploadZone } from "@/components/UploadZone";
+import { BulkUploadZone } from "@/components/BulkUploadZone";
+import { UploadPreview } from "@/components/UploadPreview";
+import { UploadQueue, UploadQueueItem } from "@/components/UploadQueue";
 import { UploadResult } from "@/components/UploadResult";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { UploadsHistory } from "@/components/UploadsHistory";
@@ -11,7 +13,7 @@ import {
   handleOAuthCallback, 
   revokeOAuthSession, 
   restorePersistedSession, 
-  uploadBlobWithOAuth,
+  uploadMultipleBlobsWithOAuth,
   getStoredAccounts,
   saveAccount,
   setActiveAccountDid,
@@ -19,15 +21,13 @@ import {
   StoredAccount
 } from "@/lib/oauth";
 
+type UploadPhase = "idle" | "preview" | "uploading" | "complete";
+
 const Index = () => {
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<{
-    imageUrl: string;
-    blobCid: string;
-    recordUri: string;
-    did: string;
-    uploadId: string;
-  } | null>(null);
+  const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
+  const [completedCount, setCompletedCount] = useState(0);
   const [activeUser, setActiveUser] = useState<StoredAccount | null>(null);
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
@@ -69,11 +69,9 @@ const Index = () => {
 
   useEffect(() => {
     const initializeAuth = async () => {
-      // Load stored accounts
       const storedAccounts = getStoredAccounts();
       setAccounts(storedAccounts);
       
-      // Check for OAuth callback
       const callbackResult = await handleOAuthCallback();
       if (callbackResult) {
         const profile = await fetchUserProfile(callbackResult.did);
@@ -93,7 +91,6 @@ const Index = () => {
         return;
       }
 
-      // Restore persisted session
       const restoredSession = await restorePersistedSession();
       if (restoredSession) {
         const profile = await fetchUserProfile(restoredSession.did);
@@ -121,7 +118,7 @@ const Index = () => {
       const account = storedAccounts.find(a => a.did === did);
       if (account) {
         setActiveUser(account);
-        setUploadResult(null);
+        resetUploadState();
         setUploadsKey(prev => prev + 1);
         toast({
           title: "Switched account",
@@ -148,7 +145,7 @@ const Index = () => {
         await handleSwitchAccount(remainingAccounts[0].did);
       } else {
         setActiveUser(null);
-        setUploadResult(null);
+        resetUploadState();
       }
     }
     
@@ -158,40 +155,79 @@ const Index = () => {
     });
   };
 
-  const handleFileSelect = async (file: File) => {
-    if (!activeUser) return;
-    
-    setIsUploading(true);
-    setUploadResult(null);
+  const resetUploadState = () => {
+    setUploadPhase("idle");
+    setPendingFiles([]);
+    setUploadQueue([]);
+    setCompletedCount(0);
+  };
 
-    try {
-      const result = await uploadBlobWithOAuth(activeUser.did, file);
-      const imageUrl = URL.createObjectURL(file);
-      
-      setUploadResult({
-        imageUrl,
-        blobCid: result.blob.ref.$link,
-        recordUri: result.uri,
-        did: activeUser.did,
-        uploadId: result.uploadId,
-      });
-      
-      setUploadsKey(prev => prev + 1);
+  const handleFilesSelect = (files: File[]) => {
+    setPendingFiles(files);
+    setUploadPhase("preview");
+  };
 
-      toast({
-        title: "Upload successful",
-        description: "Your image has been uploaded to ATProto CDN",
-      });
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
+  const handleRemoveFile = (index: number) => {
+    const newFiles = pendingFiles.filter((_, i) => i !== index);
+    if (newFiles.length === 0) {
+      resetUploadState();
+    } else {
+      setPendingFiles(newFiles);
     }
+  };
+
+  const handleCancelPreview = () => {
+    resetUploadState();
+  };
+
+  const handleStartUpload = async () => {
+    if (!activeUser || pendingFiles.length === 0) return;
+
+    setUploadPhase("uploading");
+    setCompletedCount(0);
+    
+    // Initialize queue
+    const initialQueue: UploadQueueItem[] = pendingFiles.map(file => ({
+      file,
+      status: "pending",
+      progress: 0,
+    }));
+    setUploadQueue(initialQueue);
+
+    const { successCount, failedCount } = await uploadMultipleBlobsWithOAuth(
+      activeUser.did,
+      pendingFiles,
+      (index, status, error) => {
+        setUploadQueue(prev => {
+          const newQueue = [...prev];
+          newQueue[index] = {
+            ...newQueue[index],
+            status,
+            progress: status === 'completed' ? 100 : status === 'uploading' ? 50 : 0,
+            error,
+          };
+          return newQueue;
+        });
+        
+        if (status === 'completed' || status === 'failed') {
+          setCompletedCount(prev => prev + 1);
+        }
+      }
+    );
+
+    setUploadPhase("complete");
+    setUploadsKey(prev => prev + 1);
+
+    toast({
+      title: "Upload complete",
+      description: `${successCount} uploaded${failedCount > 0 ? `, ${failedCount} failed` : ''}`,
+      variant: failedCount > 0 ? "destructive" : "default",
+    });
+
+    // Auto-reset after showing results
+    setTimeout(() => {
+      resetUploadState();
+    }, 3000);
   };
 
   return (
@@ -235,22 +271,35 @@ const Index = () => {
               <div className="text-center text-sm text-muted-foreground">
                 Saving to your PDS (@{activeUser.handle})
               </div>
-              <UploadZone onFileSelect={handleFileSelect} isUploading={isUploading} />
+              
+              {uploadPhase === "idle" && (
+                <BulkUploadZone 
+                  onFilesSelect={handleFilesSelect} 
+                  isUploading={false}
+                />
+              )}
+
+              {uploadPhase === "preview" && (
+                <UploadPreview
+                  files={pendingFiles}
+                  onUpload={handleStartUpload}
+                  onCancel={handleCancelPreview}
+                  onRemoveFile={handleRemoveFile}
+                  isUploading={false}
+                />
+              )}
+
+              {(uploadPhase === "uploading" || uploadPhase === "complete") && (
+                <UploadQueue
+                  items={uploadQueue}
+                  completedCount={completedCount}
+                  totalCount={pendingFiles.length}
+                />
+              )}
             </>
           ) : (
             <div className="text-center py-12 space-y-4">
               <p className="text-muted-foreground">Sign in to upload images to your PDS</p>
-            </div>
-          )}
-          
-          {uploadResult && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <UploadResult
-                imageUrl={uploadResult.imageUrl}
-                blobCid={uploadResult.blobCid}
-                recordUri={uploadResult.recordUri}
-                did={uploadResult.did}
-              />
             </div>
           )}
           
