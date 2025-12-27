@@ -1,13 +1,14 @@
 import { useCallback, useState } from "react";
-import { Upload, Cloud } from "lucide-react";
+import { Upload, Cloud, Images } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface UploadZoneProps {
-  onFileSelect: (file: File) => void;
+interface BulkUploadZoneProps {
+  onFilesSelect: (files: File[]) => void;
   isUploading: boolean;
+  disabled?: boolean;
 }
 
-export const UploadZone = ({ onFileSelect, isUploading }: UploadZoneProps) => {
+export const BulkUploadZone = ({ onFilesSelect, isUploading, disabled }: BulkUploadZoneProps) => {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -35,18 +36,29 @@ export const UploadZone = ({ onFileSelect, isUploading }: UploadZoneProps) => {
     setIsDragging(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      if (file.type.startsWith('image/')) {
-        onFileSelect(file);
+      const imageFiles = Array.from(e.dataTransfer.files).filter(file => 
+        file.type.startsWith('image/')
+      );
+      if (imageFiles.length > 0) {
+        onFilesSelect(imageFiles);
       }
     }
-  }, [onFileSelect]);
+  }, [onFilesSelect]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onFileSelect(e.target.files[0]);
+      const imageFiles = Array.from(e.target.files).filter(file => 
+        file.type.startsWith('image/')
+      );
+      if (imageFiles.length > 0) {
+        onFilesSelect(imageFiles);
+      }
     }
-  }, [onFileSelect]);
+    // Reset input so same files can be selected again
+    e.target.value = '';
+  }, [onFilesSelect]);
+
+  const isDisabled = isUploading || disabled;
 
   return (
     <div
@@ -57,7 +69,7 @@ export const UploadZone = ({ onFileSelect, isUploading }: UploadZoneProps) => {
         isDragging 
           ? "border-primary bg-primary/5 shadow-[var(--shadow-medium)]" 
           : "border-border",
-        isUploading && "opacity-50 pointer-events-none"
+        isDisabled && "opacity-50 pointer-events-none"
       )}
       onDragEnter={handleDragIn}
       onDragLeave={handleDragOut}
@@ -74,16 +86,16 @@ export const UploadZone = ({ onFileSelect, isUploading }: UploadZoneProps) => {
             {isUploading ? (
               <Cloud className="w-12 h-12 text-primary-foreground animate-pulse" />
             ) : (
-              <Upload className="w-12 h-12 text-primary-foreground" />
+              <Images className="w-12 h-12 text-primary-foreground" />
             )}
           </div>
         </div>
 
         <h3 className="text-xl font-semibold mb-2 text-foreground">
-          {isUploading ? "Uploading..." : "Drop your image here"}
+          {isUploading ? "Uploading..." : "Drop your images here"}
         </h3>
         <p className="text-sm text-muted-foreground mb-4">
-          or click to browse
+          or click to browse • Select multiple files
         </p>
         <p className="text-xs text-muted-foreground">
           Supports JPG, PNG, GIF, WebP
@@ -93,8 +105,9 @@ export const UploadZone = ({ onFileSelect, isUploading }: UploadZoneProps) => {
           type="file"
           className="hidden"
           accept="image/*"
+          multiple
           onChange={handleFileInput}
-          disabled={isUploading}
+          disabled={isDisabled}
         />
       </label>
     </div>

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Copy, Check, ExternalLink, RefreshCw, Share2 } from "lucide-react";
+import { Copy, Check, ExternalLink, RefreshCw, Share2, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { fetchUserUploads } from "@/lib/oauth";
+import { UploadFilters, UploadFiltersState, defaultFilters } from "./UploadFilters";
 
 interface Upload {
   id: string;
@@ -11,6 +12,7 @@ interface Upload {
   mimeType: string;
   createdAt: string;
   filename: string | null;
+  sizeBytes: number;
 }
 
 interface UploadsHistoryProps {
@@ -21,17 +23,25 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<UploadFiltersState>(defaultFilters);
 
   const loadUploads = async () => {
     setIsLoading(true);
-    const data = await fetchUserUploads(did);
+    const data = await fetchUserUploads(did, {
+      search: filters.search,
+      dateRange: filters.dateRange,
+      mimeType: filters.mimeType,
+      sizeRange: filters.sizeRange,
+      sortBy: filters.sortBy,
+      sortOrder: filters.sortOrder,
+    });
     setUploads(data);
     setIsLoading(false);
   };
 
   useEffect(() => {
     loadUploads();
-  }, [did]);
+  }, [did, filters]);
 
   const getBlobUrl = (cid: string) => {
     return `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${cid}`;
@@ -51,15 +61,6 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  if (isLoading) {
-    return (
-      <div className="bg-card border border-border rounded-xl p-6">
-        <h2 className="text-lg font-semibold mb-4">Your Uploads</h2>
-        <div className="text-center text-muted-foreground py-8">Loading uploads...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-card border border-border rounded-xl p-6">
       <div className="flex items-center justify-between mb-4">
@@ -69,9 +70,20 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
         </Button>
       </div>
       
-      {uploads.length === 0 ? (
-        <div className="text-center text-muted-foreground py-8">
-          No uploads yet. Upload an image to get started!
+      <div className="mb-4">
+        <UploadFilters filters={filters} onFiltersChange={setFilters} />
+      </div>
+
+      {isLoading ? (
+        <div className="text-center text-muted-foreground py-8">Loading uploads...</div>
+      ) : uploads.length === 0 ? (
+        <div className="text-center text-muted-foreground py-8 space-y-2">
+          <ImageOff className="w-10 h-10 mx-auto opacity-50" />
+          <p>
+            {filters.search || filters.dateRange !== 'all' || filters.mimeType !== 'all' || filters.sizeRange !== 'all'
+              ? "No uploads match your filters"
+              : "No uploads yet. Upload an image to get started!"}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
