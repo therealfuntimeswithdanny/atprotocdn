@@ -73,6 +73,42 @@ export const resolvePdsUrl = async (did: string): Promise<string> => {
   }
 };
 
+// Fetch user profile from any PDS
+export const fetchUserProfile = async (did: string): Promise<{ handle: string; avatar?: string }> => {
+  let handle = did;
+  let avatar: string | undefined;
+  
+  const pdsUrl = await resolvePdsUrl(did);
+  
+  try {
+    const describeResponse = await fetch(
+      `${pdsUrl}/xrpc/com.atproto.repo.describeRepo?repo=${did}`
+    );
+    if (describeResponse.ok) {
+      const describeData = await describeResponse.json();
+      handle = describeData.handle || did;
+    }
+  } catch (error) {
+    console.error('Failed to fetch handle:', error);
+  }
+  
+  try {
+    const profileResponse = await fetch(
+      `${pdsUrl}/xrpc/com.atproto.repo.getRecord?repo=${did}&collection=app.bsky.actor.profile&rkey=self`
+    );
+    if (profileResponse.ok) {
+      const profileData = await profileResponse.json();
+      if (profileData.value?.avatar?.ref?.$link) {
+        avatar = `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${profileData.value.avatar.ref.$link}`;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch profile:', error);
+  }
+  
+  return { handle, avatar };
+};
+
 // Multi-account storage helpers
 export const getStoredAccounts = (): StoredAccount[] => {
   const stored = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
