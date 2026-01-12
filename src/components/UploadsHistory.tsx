@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Copy, Check, ExternalLink, RefreshCw, Share2, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { fetchUserUploads } from "@/lib/oauth";
+import { fetchUserUploads, resolvePdsUrl } from "@/lib/oauth";
 import { UploadFilters, UploadFiltersState, defaultFilters } from "./UploadFilters";
 
 interface Upload {
@@ -24,6 +24,15 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<UploadFiltersState>(defaultFilters);
+  const [pdsUrl, setPdsUrl] = useState<string>("");
+
+  useEffect(() => {
+    const resolvePds = async () => {
+      const url = await resolvePdsUrl(did);
+      setPdsUrl(url);
+    };
+    resolvePds();
+  }, [did]);
 
   const loadUploads = async () => {
     setIsLoading(true);
@@ -40,11 +49,13 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
   };
 
   useEffect(() => {
-    loadUploads();
-  }, [did, filters]);
+    if (pdsUrl) {
+      loadUploads();
+    }
+  }, [did, filters, pdsUrl]);
 
   const getBlobUrl = (cid: string) => {
-    return `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${cid}`;
+    return `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${cid}`;
   };
 
   const getShareUrl = (id: string) => {

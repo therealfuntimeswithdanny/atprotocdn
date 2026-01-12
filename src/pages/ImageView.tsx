@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { resolvePdsUrl } from "@/lib/oauth";
 
 interface UploadData {
   id: string;
@@ -30,6 +31,7 @@ export default function ImageView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pdsUrl, setPdsUrl] = useState<string>("");
 
   useEffect(() => {
     const fetchUpload = async () => {
@@ -50,6 +52,10 @@ export default function ImageView() {
         }
 
         setUpload(data);
+        
+        // Resolve PDS URL for this user
+        const resolvedPds = await resolvePdsUrl(data.user_did);
+        setPdsUrl(resolvedPds);
       } catch (err) {
         console.error("Failed to fetch upload:", err);
         setError("Failed to load image");
@@ -61,8 +67,8 @@ export default function ImageView() {
     fetchUpload();
   }, [id]);
 
-  const imageUrl = upload
-    ? `https://pds.madebydanny.uk/xrpc/com.atproto.sync.getBlob?did=${upload.user_did}&cid=${upload.blob_cid}`
+  const imageUrl = upload && pdsUrl
+    ? `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${upload.user_did}&cid=${upload.blob_cid}`
     : "";
 
   const handleCopy = async () => {
@@ -108,11 +114,13 @@ export default function ImageView() {
 
         <Card className="overflow-hidden bg-card/50 border-border/50">
           <div className="relative bg-muted/30">
-            <img
-              src={imageUrl}
-              alt={upload.filename || "Uploaded image"}
-              className="w-full h-auto max-h-[70vh] object-contain"
-            />
+            {imageUrl && (
+              <img
+                src={imageUrl}
+                alt={upload.filename || "Uploaded image"}
+                className="w-full h-auto max-h-[70vh] object-contain"
+              />
+            )}
           </div>
           
           <div className="p-6 space-y-4">
@@ -135,7 +143,7 @@ export default function ImageView() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={handleCopy} variant="outline" size="sm">
+              <Button onClick={handleCopy} variant="outline" size="sm" disabled={!imageUrl}>
                 {copied ? (
                   <Check className="mr-2 h-4 w-4" />
                 ) : (
@@ -143,12 +151,14 @@ export default function ImageView() {
                 )}
                 {copied ? "Copied!" : "Copy Link"}
               </Button>
-              <a href={imageUrl} target="_blank" rel="noopener noreferrer">
-                <Button variant="outline" size="sm">
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Open Original
-                </Button>
-              </a>
+              {imageUrl && (
+                <a href={imageUrl} target="_blank" rel="noopener noreferrer">
+                  <Button variant="outline" size="sm">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open Original
+                  </Button>
+                </a>
+              )}
             </div>
           </div>
         </Card>
