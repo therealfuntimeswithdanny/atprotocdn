@@ -19,7 +19,8 @@ export const getOAuthClient = () => {
     const clientId = `${origin}/client-metadata.json`;
     
     oauthClient = new BrowserOAuthClient({
-      handleResolver: 'https://pds.madebydanny.uk',
+      // Use the public Bluesky handle resolver to support any PDS
+      handleResolver: 'https://bsky.social',
       clientMetadata: {
         client_id: clientId,
         client_name: 'ATProto CDN Tool',
@@ -36,6 +37,40 @@ export const getOAuthClient = () => {
     });
   }
   return oauthClient;
+};
+
+// Resolve a user's PDS URL from their DID
+export const resolvePdsUrl = async (did: string): Promise<string> => {
+  try {
+    // Fetch the DID document to get the PDS endpoint
+    const didDocUrl = did.startsWith('did:plc:')
+      ? `https://plc.directory/${did}`
+      : `https://${did.replace('did:web:', '')}/.well-known/did.json`;
+    
+    const response = await fetch(didDocUrl);
+    if (!response.ok) {
+      throw new Error('Failed to resolve DID document');
+    }
+    
+    const didDoc = await response.json();
+    
+    // Find the atproto PDS service endpoint
+    const pdsService = didDoc.service?.find(
+      (s: { id: string; type: string; serviceEndpoint: string }) => 
+        s.id === '#atproto_pds' || s.type === 'AtprotoPersonalDataServer'
+    );
+    
+    if (pdsService?.serviceEndpoint) {
+      return pdsService.serviceEndpoint;
+    }
+    
+    // Fallback to bsky.social if no PDS found
+    return 'https://bsky.social';
+  } catch (error) {
+    console.error('Failed to resolve PDS URL:', error);
+    // Default fallback
+    return 'https://bsky.social';
+  }
 };
 
 // Multi-account storage helpers
@@ -169,7 +204,8 @@ export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
     throw new Error('No active session');
   }
 
-  const pdsUrl = 'https://pds.madebydanny.uk';
+  // Dynamically resolve the user's PDS URL
+  const pdsUrl = await resolvePdsUrl(did);
   
   const arrayBuffer = await file.arrayBuffer();
   const fileData = new Uint8Array(arrayBuffer);
