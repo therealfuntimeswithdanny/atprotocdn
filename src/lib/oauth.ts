@@ -227,6 +227,16 @@ export const revokeOAuthSession = async (did: string) => {
   removeAccount(did);
 };
 
+// Helper to determine if a file is a video
+export const isVideoFile = (file: File): boolean => {
+  return file.type.startsWith('video/');
+};
+
+// Helper to determine if a mime type is video
+export const isVideoMimeType = (mimeType: string): boolean => {
+  return mimeType.startsWith('video/');
+};
+
 // Upload blob using OAuth session directly (for authenticated users)
 export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
   blob: { ref: { $link: string }; mimeType: string; size: number };
@@ -261,9 +271,13 @@ export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
   
   const blobData = await blobResponse.json();
   
+  // Determine the record type based on file type
+  const isVideo = isVideoFile(file);
+  const recordType = isVideo ? 'uk.madebydanny.cdn.video' : 'uk.madebydanny.cdn.img';
+  
   const record = {
     blob: blobData.blob,
-    $type: 'uk.madebydanny.cdn.img',
+    $type: recordType,
     langs: ['en'],
     createdAt: new Date().toISOString(),
   };
@@ -275,7 +289,7 @@ export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
     },
     body: JSON.stringify({
       repo: did,
-      collection: 'uk.madebydanny.cdn.img',
+      collection: recordType,
       record,
     }),
   });
@@ -384,7 +398,13 @@ export const fetchUserUploads = async (did: string, filters?: UploadFiltersParam
     
     // Apply mime type filter
     if (filters?.mimeType && filters.mimeType !== 'all') {
-      query = query.eq('mime_type', filters.mimeType);
+      if (filters.mimeType === 'images') {
+        query = query.like('mime_type', 'image/%');
+      } else if (filters.mimeType === 'videos') {
+        query = query.like('mime_type', 'video/%');
+      } else {
+        query = query.eq('mime_type', filters.mimeType);
+      }
     }
     
     // Apply size range filter

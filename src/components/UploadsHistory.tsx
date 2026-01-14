@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { Copy, Check, ExternalLink, RefreshCw, Share2, ImageOff, Search, Filter } from "lucide-react";
+import { Copy, Check, ExternalLink, RefreshCw, Share2, ImageOff, Search, Filter, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
-import { fetchUserUploads, resolvePdsUrl } from "@/lib/oauth";
+import { fetchUserUploads, resolvePdsUrl, isVideoMimeType } from "@/lib/oauth";
 import { UploadFilters, UploadFiltersState, defaultFilters } from "./UploadFilters";
 import { cn } from "@/lib/utils";
 import {
@@ -141,65 +141,85 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
               {hasActiveFilters ? "No uploads match your filters" : "No uploads yet"}
             </p>
             <p className="text-sm text-muted-foreground">
-              {hasActiveFilters ? "Try adjusting your filters" : "Upload an image to get started"}
+              {hasActiveFilters ? "Try adjusting your filters" : "Upload an image or video to get started"}
             </p>
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {uploads.map((upload) => (
-            <div key={upload.id} className="group relative">
-              <Link to={`/i/${upload.id}`}>
-                <div className="aspect-square rounded-xl overflow-hidden bg-muted">
-                  <img
-                    src={getBlobUrl(upload.cid)}
-                    alt={upload.filename || "Upload"}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    loading="lazy"
-                  />
+          {uploads.map((upload) => {
+            const isVideo = isVideoMimeType(upload.mimeType);
+            
+            return (
+              <div key={upload.id} className="group relative">
+                <Link to={`/i/${upload.id}`}>
+                  <div className="aspect-square rounded-xl overflow-hidden bg-muted relative">
+                    {isVideo ? (
+                      <>
+                        <video
+                          src={getBlobUrl(upload.cid)}
+                          className="w-full h-full object-cover"
+                          muted
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
+                            <Play className="w-5 h-5 text-foreground fill-foreground ml-0.5" />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <img
+                        src={getBlobUrl(upload.cid)}
+                        alt={upload.filename || "Upload"}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
+                </Link>
+                <div className="absolute inset-0 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center gap-2 rounded-xl pointer-events-none group-hover:pointer-events-auto">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-9 w-9 p-0"
+                    onClick={() => handleCopy(upload.id, 'blob')}
+                  >
+                    {copiedId === `${upload.id}-blob` ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-9 w-9 p-0"
+                    onClick={() => handleCopy(upload.id, 'share')}
+                  >
+                    {copiedId === `${upload.id}-share` ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Share2 className="w-4 h-4" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-9 w-9 p-0"
+                    asChild
+                  >
+                    <a href={getBlobUrl(upload.cid)} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </Button>
                 </div>
-              </Link>
-              <div className="absolute inset-0 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center gap-2 rounded-xl pointer-events-none group-hover:pointer-events-auto">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-9 w-9 p-0"
-                  onClick={() => handleCopy(upload.id, 'blob')}
-                >
-                  {copiedId === `${upload.id}-blob` ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-9 w-9 p-0"
-                  onClick={() => handleCopy(upload.id, 'share')}
-                >
-                  {copiedId === `${upload.id}-share` ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    <Share2 className="w-4 h-4" />
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-9 w-9 p-0"
-                  asChild
-                >
-                  <a href={getBlobUrl(upload.cid)} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </Button>
+                <p className="mt-2 text-xs text-muted-foreground truncate">
+                  {upload.filename || new Date(upload.createdAt).toLocaleDateString()}
+                </p>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground truncate">
-                {upload.filename || new Date(upload.createdAt).toLocaleDateString()}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
