@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Upload, Cloud, Images } from "lucide-react";
+import { Upload, Cloud, Images, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BulkUploadZoneProps {
@@ -54,7 +54,6 @@ export const BulkUploadZone = ({ onFilesSelect, isUploading, disabled }: BulkUpl
         onFilesSelect(imageFiles);
       }
     }
-    // Reset input so same files can be selected again
     e.target.value = '';
   }, [onFilesSelect]);
 
@@ -63,12 +62,11 @@ export const BulkUploadZone = ({ onFilesSelect, isUploading, disabled }: BulkUpl
   return (
     <div
       className={cn(
-        "relative rounded-lg border-2 border-dashed transition-all duration-300",
-        "bg-gradient-to-br from-card to-muted/30",
-        "hover:shadow-[var(--shadow-soft)]",
+        "relative rounded-2xl border-2 border-dashed transition-all duration-300",
+        "bg-gradient-to-b from-muted/50 to-muted/20",
         isDragging 
-          ? "border-primary bg-primary/5 shadow-[var(--shadow-medium)]" 
-          : "border-border",
+          ? "border-primary bg-primary/5 scale-[1.02]" 
+          : "border-border hover:border-muted-foreground/50",
         isDisabled && "opacity-50 pointer-events-none"
       )}
       onDragEnter={handleDragIn}
@@ -76,30 +74,40 @@ export const BulkUploadZone = ({ onFilesSelect, isUploading, disabled }: BulkUpl
       onDragOver={handleDrag}
       onDrop={handleDrop}
     >
-      <label className="flex flex-col items-center justify-center py-16 px-8 cursor-pointer">
-        <div className="relative mb-6">
-          <div className={cn(
-            "absolute inset-0 bg-gradient-to-r from-primary to-accent rounded-full blur-xl opacity-30 transition-opacity",
-            isDragging && "opacity-50"
+      <label className="flex flex-col items-center justify-center py-20 px-8 cursor-pointer">
+        <div className={cn(
+          "relative mb-6 p-6 rounded-2xl transition-all duration-300",
+          isDragging 
+            ? "bg-primary scale-110" 
+            : "bg-muted"
+        )}>
+          <ImagePlus className={cn(
+            "w-10 h-10 transition-colors",
+            isDragging ? "text-primary-foreground" : "text-muted-foreground"
           )} />
-          <div className="relative bg-gradient-to-br from-primary to-accent p-5 rounded-full">
-            {isUploading ? (
-              <Cloud className="w-12 h-12 text-primary-foreground animate-pulse" />
-            ) : (
-              <Images className="w-12 h-12 text-primary-foreground" />
-            )}
-          </div>
         </div>
 
         <h3 className="text-xl font-semibold mb-2 text-foreground">
-          {isUploading ? "Uploading..." : "Drop your images here"}
+          {isUploading ? "Uploading..." : "Drop images here"}
         </h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          or click to browse • Select multiple files
+        <p className="text-sm text-muted-foreground mb-6">
+          or click to browse your files
         </p>
-        <p className="text-xs text-muted-foreground">
-          Supports JPG, PNG, GIF, WebP
-        </p>
+        
+        <div className="flex flex-wrap gap-2 justify-center">
+          <span className="px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
+            JPG
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
+            PNG
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
+            GIF
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
+            WebP
+          </span>
+        </div>
 
         <input
           type="file"

@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
-import { Cloud } from "lucide-react";
+import { Cloud, Upload, History, BarChart3, Menu } from "lucide-react";
 import { BulkUploadZone } from "@/components/BulkUploadZone";
 import { UploadPreview } from "@/components/UploadPreview";
 import { UploadQueue, UploadQueueItem } from "@/components/UploadQueue";
-import { UploadResult } from "@/components/UploadResult";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { UploadsHistory } from "@/components/UploadsHistory";
 import { UploadStats } from "@/components/UploadStats";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import { 
   handleOAuthCallback, 
   revokeOAuthSession, 
@@ -23,6 +25,7 @@ import {
 } from "@/lib/oauth";
 
 type UploadPhase = "idle" | "preview" | "uploading" | "complete";
+type ActiveTab = "upload" | "history";
 
 const Index = () => {
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle");
@@ -33,6 +36,8 @@ const Index = () => {
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [uploadsKey, setUploadsKey] = useState(0);
+  const [activeTab, setActiveTab] = useState<ActiveTab>("upload");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -154,7 +159,6 @@ const Index = () => {
     setUploadPhase("uploading");
     setCompletedCount(0);
     
-    // Initialize queue
     const initialQueue: UploadQueueItem[] = pendingFiles.map(file => ({
       file,
       status: "pending",
@@ -192,16 +196,56 @@ const Index = () => {
       variant: failedCount > 0 ? "destructive" : "default",
     });
 
-    // Auto-reset after showing results
     setTimeout(() => {
       resetUploadState();
     }, 3000);
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="container max-w-4xl mx-auto px-4 py-12">
-        <div className="absolute top-4 right-4 flex items-center gap-2">
+  const NavItem = ({ tab, icon: Icon, label }: { tab: ActiveTab; icon: typeof Upload; label: string }) => (
+    <button
+      onClick={() => {
+        setActiveTab(tab);
+        setMobileMenuOpen(false);
+      }}
+      className={cn(
+        "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all",
+        activeTab === tab 
+          ? "bg-primary text-primary-foreground shadow-md" 
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+      )}
+    >
+      <Icon className="w-5 h-5" />
+      {label}
+    </button>
+  );
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      <div className="p-6">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-primary to-primary/80 p-2 rounded-xl">
+            <Cloud className="w-6 h-6 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="font-bold text-lg">ATProto CDN</h1>
+            <p className="text-xs text-muted-foreground">Decentralized Storage</p>
+          </div>
+        </div>
+      </div>
+      
+      <nav className="flex-1 px-4 space-y-2">
+        <NavItem tab="upload" icon={Upload} label="Upload" />
+        <NavItem tab="history" icon={History} label="History" />
+      </nav>
+      
+      {activeUser && (
+        <div className="p-4 border-t border-border">
+          <UploadStats did={activeUser.did} refreshKey={uploadsKey} compact />
+        </div>
+      )}
+      
+      <div className="p-4 border-t border-border">
+        <div className="flex items-center justify-between">
           <ThemeToggle />
           <AccountSwitcher 
             activeUser={activeUser}
@@ -210,79 +254,133 @@ const Index = () => {
             onLogout={handleLogout}
           />
         </div>
-        
-        <header className="text-center mb-12">
-          <div className="inline-flex items-center justify-center mb-6">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent rounded-full blur-2xl opacity-30" />
-              <div className="relative bg-gradient-to-br from-primary to-accent p-4 rounded-2xl">
-                <Cloud className="w-10 h-10 text-primary-foreground" />
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-background flex">
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex w-72 border-r border-border flex-col bg-card/50">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile Header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
+        <div className="flex items-center justify-between px-4 h-16">
+          <div className="flex items-center gap-3">
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72 p-0">
+                <SidebarContent />
+              </SheetContent>
+            </Sheet>
+            <div className="flex items-center gap-2">
+              <div className="bg-gradient-to-br from-primary to-primary/80 p-1.5 rounded-lg">
+                <Cloud className="w-4 h-4 text-primary-foreground" />
               </div>
+              <span className="font-semibold">ATProto CDN</span>
             </div>
           </div>
-          
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            ATProto CDN
-          </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Upload images to your ATProto account and get permanent, decentralized storage
-          </p>
-        </header>
-
-        <main className="space-y-8">
-          {isRestoringSession ? (
-            <div className="text-center text-sm text-muted-foreground">
-              Restoring session...
-            </div>
-          ) : activeUser ? (
-            <>
-              <div className="text-center text-sm text-muted-foreground">
-                Saving to your PDS (@{activeUser.handle})
-              </div>
-              
-              {uploadPhase === "idle" && (
-                <BulkUploadZone 
-                  onFilesSelect={handleFilesSelect} 
-                  isUploading={false}
-                />
-              )}
-
-              {uploadPhase === "preview" && (
-                <UploadPreview
-                  files={pendingFiles}
-                  onUpload={handleStartUpload}
-                  onCancel={handleCancelPreview}
-                  onRemoveFile={handleRemoveFile}
-                  isUploading={false}
-                />
-              )}
-
-              {(uploadPhase === "uploading" || uploadPhase === "complete") && (
-                <UploadQueue
-                  items={uploadQueue}
-                  completedCount={completedCount}
-                  totalCount={pendingFiles.length}
-                />
-              )}
-            </>
-          ) : (
-            <div className="text-center py-12 space-y-4">
-              <p className="text-muted-foreground">Sign in to upload images to your PDS</p>
-            </div>
-          )}
-          
-          {activeUser && (
-            <>
-              <UploadStats did={activeUser.did} refreshKey={uploadsKey} />
-              <UploadsHistory key={uploadsKey} did={activeUser.did} />
-            </>
-          )}
-        </main>
-
-        <footer className="mt-16 text-center text-sm text-muted-foreground">
-          <p>Powered by ATProto</p>
-        </footer>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <AccountSwitcher 
+              activeUser={activeUser}
+              accounts={accounts}
+              onSwitchAccount={handleSwitchAccount}
+              onLogout={handleLogout}
+            />
+          </div>
+        </div>
       </div>
+
+      {/* Main Content */}
+      <main className="flex-1 lg:overflow-auto">
+        <div className="lg:hidden h-16" /> {/* Spacer for mobile header */}
+        
+        <div className="max-w-4xl mx-auto p-6 lg:p-10">
+          {isRestoringSession ? (
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="text-center space-y-4">
+                <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
+                <p className="text-muted-foreground">Restoring session...</p>
+              </div>
+            </div>
+          ) : !activeUser ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
+              <div className="bg-gradient-to-br from-primary/20 to-primary/5 p-8 rounded-full">
+                <Cloud className="w-16 h-16 text-primary" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold">Welcome to ATProto CDN</h2>
+                <p className="text-muted-foreground max-w-md">
+                  Sign in with your ATProto account to upload images to your Personal Data Server
+                </p>
+              </div>
+              <AccountSwitcher 
+                activeUser={activeUser}
+                accounts={accounts}
+                onSwitchAccount={handleSwitchAccount}
+                onLogout={handleLogout}
+              />
+            </div>
+          ) : (
+            <>
+              {activeTab === "upload" && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-1">Upload Images</h2>
+                    <p className="text-muted-foreground text-sm">
+                      Upload to @{activeUser.handle}'s PDS
+                    </p>
+                  </div>
+                  
+                  {uploadPhase === "idle" && (
+                    <BulkUploadZone 
+                      onFilesSelect={handleFilesSelect} 
+                      isUploading={false}
+                    />
+                  )}
+
+                  {uploadPhase === "preview" && (
+                    <UploadPreview
+                      files={pendingFiles}
+                      onUpload={handleStartUpload}
+                      onCancel={handleCancelPreview}
+                      onRemoveFile={handleRemoveFile}
+                      isUploading={false}
+                    />
+                  )}
+
+                  {(uploadPhase === "uploading" || uploadPhase === "complete") && (
+                    <UploadQueue
+                      items={uploadQueue}
+                      completedCount={completedCount}
+                      totalCount={pendingFiles.length}
+                    />
+                  )}
+                </div>
+              )}
+
+              {activeTab === "history" && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-1">Upload History</h2>
+                    <p className="text-muted-foreground text-sm">
+                      Your uploaded images
+                    </p>
+                  </div>
+                  <UploadsHistory key={uploadsKey} did={activeUser.did} />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </main>
     </div>
   );
 };

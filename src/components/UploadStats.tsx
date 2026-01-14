@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { Image, HardDrive } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface UploadStatsProps {
   did: string;
   refreshKey?: number;
+  compact?: boolean;
 }
 
 interface Stats {
@@ -21,7 +23,7 @@ const formatBytes = (bytes: number): string => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 };
 
-export function UploadStats({ did, refreshKey }: UploadStatsProps) {
+export function UploadStats({ did, refreshKey, compact = false }: UploadStatsProps) {
   const [stats, setStats] = useState<Stats>({ totalUploads: 0, totalSize: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -49,6 +51,27 @@ export function UploadStats({ did, refreshKey }: UploadStatsProps) {
 
     fetchStats();
   }, [did, refreshKey]);
+
+  if (compact) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Image className="w-4 h-4" />
+            <span>Uploads</span>
+          </div>
+          <span className="font-medium">{isLoading ? "—" : stats.totalUploads}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <HardDrive className="w-4 h-4" />
+            <span>Storage</span>
+          </div>
+          <span className="font-medium">{isLoading ? "—" : formatBytes(stats.totalSize)}</span>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

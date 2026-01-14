@@ -1,9 +1,16 @@
 import { useState, useEffect } from "react";
-import { Copy, Check, ExternalLink, RefreshCw, Share2, ImageOff } from "lucide-react";
+import { Copy, Check, ExternalLink, RefreshCw, Share2, ImageOff, Search, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { fetchUserUploads, resolvePdsUrl } from "@/lib/oauth";
 import { UploadFilters, UploadFiltersState, defaultFilters } from "./UploadFilters";
+import { cn } from "@/lib/utils";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface Upload {
   id: string;
@@ -25,6 +32,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<UploadFiltersState>(defaultFilters);
   const [pdsUrl, setPdsUrl] = useState<string>("");
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const resolvePds = async () => {
@@ -72,48 +80,90 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const hasActiveFilters = filters.search || filters.dateRange !== 'all' || filters.mimeType !== 'all' || filters.sizeRange !== 'all';
+
   return (
-    <div className="bg-card border border-border rounded-xl p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Your Uploads</h2>
-        <Button variant="ghost" size="sm" onClick={loadUploads}>
-          <RefreshCw className="w-4 h-4" />
+    <div className="space-y-4">
+      {/* Search and Filter Bar */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search uploads..."
+            value={filters.search}
+            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+            className="pl-9 bg-muted/50 border-0"
+          />
+        </div>
+        <Collapsible open={showFilters} onOpenChange={setShowFilters}>
+          <CollapsibleTrigger asChild>
+            <Button 
+              variant="outline" 
+              size="icon"
+              className={cn(hasActiveFilters && "border-primary text-primary")}
+            >
+              <Filter className="w-4 h-4" />
+            </Button>
+          </CollapsibleTrigger>
+        </Collapsible>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={loadUploads}
+          disabled={isLoading}
+        >
+          <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
         </Button>
       </div>
-      
-      <div className="mb-4">
-        <UploadFilters filters={filters} onFiltersChange={setFilters} />
-      </div>
 
+      <Collapsible open={showFilters} onOpenChange={setShowFilters}>
+        <CollapsibleContent>
+          <div className="pb-4">
+            <UploadFilters filters={filters} onFiltersChange={setFilters} />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Grid */}
       {isLoading ? (
-        <div className="text-center text-muted-foreground py-8">Loading uploads...</div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="aspect-square rounded-xl bg-muted animate-pulse" />
+          ))}
+        </div>
       ) : uploads.length === 0 ? (
-        <div className="text-center text-muted-foreground py-8 space-y-2">
-          <ImageOff className="w-10 h-10 mx-auto opacity-50" />
-          <p>
-            {filters.search || filters.dateRange !== 'all' || filters.mimeType !== 'all' || filters.sizeRange !== 'all'
-              ? "No uploads match your filters"
-              : "No uploads yet. Upload an image to get started!"}
-          </p>
+        <div className="text-center py-16 space-y-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-muted">
+            <ImageOff className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <div className="space-y-1">
+            <p className="font-medium">
+              {hasActiveFilters ? "No uploads match your filters" : "No uploads yet"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {hasActiveFilters ? "Try adjusting your filters" : "Upload an image to get started"}
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {uploads.map((upload) => (
             <div key={upload.id} className="group relative">
               <Link to={`/i/${upload.id}`}>
-                <div className="aspect-square rounded-lg overflow-hidden bg-muted border border-border">
+                <div className="aspect-square rounded-xl overflow-hidden bg-muted">
                   <img
                     src={getBlobUrl(upload.cid)}
                     alt={upload.filename || "Upload"}
-                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     loading="lazy"
                   />
                 </div>
               </Link>
-              <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-lg pointer-events-none group-hover:pointer-events-auto">
+              <div className="absolute inset-0 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center gap-2 rounded-xl pointer-events-none group-hover:pointer-events-auto">
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="h-9 w-9 p-0"
                   onClick={() => handleCopy(upload.id, 'blob')}
                 >
                   {copiedId === `${upload.id}-blob` ? (
@@ -125,6 +175,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="h-9 w-9 p-0"
                   onClick={() => handleCopy(upload.id, 'share')}
                 >
                   {copiedId === `${upload.id}-share` ? (
@@ -136,6 +187,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="h-9 w-9 p-0"
                   asChild
                 >
                   <a href={getBlobUrl(upload.cid)} target="_blank" rel="noopener noreferrer">
@@ -143,9 +195,9 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
                   </a>
                 </Button>
               </div>
-              <div className="mt-1 text-xs text-muted-foreground truncate">
+              <p className="mt-2 text-xs text-muted-foreground truncate">
                 {upload.filename || new Date(upload.createdAt).toLocaleDateString()}
-              </div>
+              </p>
             </div>
           ))}
         </div>
