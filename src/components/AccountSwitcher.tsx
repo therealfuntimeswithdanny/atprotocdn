@@ -52,39 +52,39 @@ export const AccountSwitcher = ({ activeUser, accounts, onSwitchAccount, onLogou
     return (
       <Dialog open={isAddingAccount} onOpenChange={setIsAddingAccount}>
         <DialogTrigger asChild>
-          <Button size="sm" variant="outline">
-            <LogIn className="w-4 h-4 mr-2" />
+          <Button size="sm" className="gap-2">
+            <LogIn className="w-4 h-4" />
             Sign In
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Sign in with ATProto</DialogTitle>
+            <DialogTitle className="text-xl">Sign in with ATProto</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleAddAccount} className="space-y-4">
+          <form onSubmit={handleAddAccount} className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="handle">Handle or DID</Label>
+              <Label htmlFor="handle" className="text-sm font-medium">
+                Handle or DID
+              </Label>
               <Input
                 id="handle"
                 type="text"
-                placeholder="your-handle.madebydanny.uk"
+                placeholder="you.bsky.social"
                 value={handle}
                 onChange={(e) => setHandle(e.target.value)}
                 disabled={isLoading}
+                className="h-11"
               />
             </div>
             
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full h-11" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Redirecting...
                 </>
               ) : (
-                <>
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Sign in
-                </>
+                "Continue"
               )}
             </Button>
           </form>
@@ -97,23 +97,25 @@ export const AccountSwitcher = ({ activeUser, accounts, onSwitchAccount, onLogou
     <Dialog open={isAddingAccount} onOpenChange={setIsAddingAccount}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="flex items-center gap-2 h-auto py-2 px-3">
-            <Avatar className="w-8 h-8">
+          <Button variant="ghost" size="sm" className="gap-2 h-9 px-2">
+            <Avatar className="w-7 h-7">
               {activeUser.avatar && <AvatarImage src={activeUser.avatar} alt={activeUser.handle} />}
-              <AvatarFallback>
-                <User className="w-4 h-4" />
+              <AvatarFallback className="text-xs">
+                <User className="w-3.5 h-3.5" />
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium">@{activeUser.handle}</span>
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64 bg-background border border-border z-50">
+        <DropdownMenuContent align="end" className="w-64">
+          <div className="px-2 py-2">
+            <p className="text-xs text-muted-foreground">Accounts</p>
+          </div>
           {accounts.map((account) => (
             <DropdownMenuItem
               key={account.did}
               onClick={() => onSwitchAccount(account.did)}
-              className="cursor-pointer flex items-center gap-3 py-2"
+              className="cursor-pointer flex items-center gap-3 py-2.5"
             >
               <Avatar className="w-8 h-8">
                 {account.avatar && <AvatarImage src={account.avatar} alt={account.handle} />}
@@ -121,7 +123,7 @@ export const AccountSwitcher = ({ activeUser, accounts, onSwitchAccount, onLogou
                   <User className="w-4 h-4" />
                 </AvatarFallback>
               </Avatar>
-              <span className="flex-1 truncate">@{account.handle}</span>
+              <span className="flex-1 truncate text-sm">@{account.handle}</span>
               {account.did === activeUser.did && (
                 <Check className="w-4 h-4 text-primary" />
               )}
@@ -131,8 +133,8 @@ export const AccountSwitcher = ({ activeUser, accounts, onSwitchAccount, onLogou
           <DropdownMenuSeparator />
           
           <DialogTrigger asChild>
-            <DropdownMenuItem className="cursor-pointer">
-              <Plus className="w-4 h-4 mr-2" />
+            <DropdownMenuItem className="cursor-pointer gap-2">
+              <Plus className="w-4 h-4" />
               Add another account
             </DropdownMenuItem>
           </DialogTrigger>
@@ -141,42 +143,42 @@ export const AccountSwitcher = ({ activeUser, accounts, onSwitchAccount, onLogou
           
           <DropdownMenuItem 
             onClick={() => onLogout(activeUser.did)} 
-            className="cursor-pointer text-destructive focus:text-destructive"
+            className="cursor-pointer text-destructive focus:text-destructive gap-2"
           >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign out @{activeUser.handle}
+            <LogOut className="w-4 h-4" />
+            Sign out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add another account</DialogTitle>
+          <DialogTitle className="text-xl">Add another account</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleAddAccount} className="space-y-4">
+        <form onSubmit={handleAddAccount} className="space-y-4 pt-4">
           <div className="space-y-2">
-            <Label htmlFor="handle-add">Handle or DID</Label>
+            <Label htmlFor="handle-add" className="text-sm font-medium">
+              Handle or DID
+            </Label>
             <Input
               id="handle-add"
               type="text"
-              placeholder="your-handle.madebydanny.uk"
+              placeholder="you.bsky.social"
               value={handle}
               onChange={(e) => setHandle(e.target.value)}
               disabled={isLoading}
+              className="h-11"
             />
           </div>
           
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full h-11" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Redirecting...
               </>
             ) : (
-              <>
-                <LogIn className="w-4 h-4 mr-2" />
-                Sign in
-              </>
+              "Continue"
             )}
           </Button>
         </form>
