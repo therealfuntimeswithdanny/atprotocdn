@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Upload, Cloud, Images, ImagePlus } from "lucide-react";
+import { Upload, Cloud, Images, ImagePlus, Film } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BulkUploadZoneProps {
@@ -7,6 +7,15 @@ interface BulkUploadZoneProps {
   isUploading: boolean;
   disabled?: boolean;
 }
+
+const ACCEPTED_TYPES = {
+  image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+  video: ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'],
+};
+
+const isAcceptedFile = (file: File): boolean => {
+  return [...ACCEPTED_TYPES.image, ...ACCEPTED_TYPES.video].includes(file.type);
+};
 
 export const BulkUploadZone = ({ onFilesSelect, isUploading, disabled }: BulkUploadZoneProps) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -36,22 +45,18 @@ export const BulkUploadZone = ({ onFilesSelect, isUploading, disabled }: BulkUpl
     setIsDragging(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const imageFiles = Array.from(e.dataTransfer.files).filter(file => 
-        file.type.startsWith('image/')
-      );
-      if (imageFiles.length > 0) {
-        onFilesSelect(imageFiles);
+      const acceptedFiles = Array.from(e.dataTransfer.files).filter(isAcceptedFile);
+      if (acceptedFiles.length > 0) {
+        onFilesSelect(acceptedFiles);
       }
     }
   }, [onFilesSelect]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const imageFiles = Array.from(e.target.files).filter(file => 
-        file.type.startsWith('image/')
-      );
-      if (imageFiles.length > 0) {
-        onFilesSelect(imageFiles);
+      const acceptedFiles = Array.from(e.target.files).filter(isAcceptedFile);
+      if (acceptedFiles.length > 0) {
+        onFilesSelect(acceptedFiles);
       }
     }
     e.target.value = '';
@@ -81,14 +86,20 @@ export const BulkUploadZone = ({ onFilesSelect, isUploading, disabled }: BulkUpl
             ? "bg-primary scale-110" 
             : "bg-muted"
         )}>
-          <ImagePlus className={cn(
-            "w-10 h-10 transition-colors",
-            isDragging ? "text-primary-foreground" : "text-muted-foreground"
-          )} />
+          <div className="flex items-center gap-2">
+            <ImagePlus className={cn(
+              "w-8 h-8 transition-colors",
+              isDragging ? "text-primary-foreground" : "text-muted-foreground"
+            )} />
+            <Film className={cn(
+              "w-8 h-8 transition-colors",
+              isDragging ? "text-primary-foreground" : "text-muted-foreground"
+            )} />
+          </div>
         </div>
 
         <h3 className="text-xl font-semibold mb-2 text-foreground">
-          {isUploading ? "Uploading..." : "Drop images here"}
+          {isUploading ? "Uploading..." : "Drop images or videos here"}
         </h3>
         <p className="text-sm text-muted-foreground mb-6">
           or click to browse your files
@@ -107,12 +118,18 @@ export const BulkUploadZone = ({ onFilesSelect, isUploading, disabled }: BulkUpl
           <span className="px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
             WebP
           </span>
+          <span className="px-3 py-1 rounded-full bg-primary/10 text-xs text-primary font-medium">
+            MP4
+          </span>
+          <span className="px-3 py-1 rounded-full bg-primary/10 text-xs text-primary font-medium">
+            WebM
+          </span>
         </div>
 
         <input
           type="file"
           className="hidden"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
           onChange={handleFileInput}
           disabled={isDisabled}

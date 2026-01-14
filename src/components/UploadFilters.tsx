@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 export interface UploadFiltersState {
   search: string;
   dateRange: "all" | "today" | "week" | "month";
-  mimeType: "all" | "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  mimeType: "all" | "images" | "videos" | "image/jpeg" | "image/png" | "image/gif" | "image/webp" | "video/mp4" | "video/webm";
   sizeRange: "all" | "small" | "medium" | "large";
   sortBy: "date" | "size" | "name";
   sortOrder: "desc" | "asc";
@@ -132,10 +132,14 @@ export const UploadFilters = ({ filters, onFiltersChange }: UploadFiltersProps) 
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
                   <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="images">All images</SelectItem>
+                  <SelectItem value="videos">All videos</SelectItem>
                   <SelectItem value="image/jpeg">JPEG</SelectItem>
                   <SelectItem value="image/png">PNG</SelectItem>
                   <SelectItem value="image/gif">GIF</SelectItem>
                   <SelectItem value="image/webp">WebP</SelectItem>
+                  <SelectItem value="video/mp4">MP4</SelectItem>
+                  <SelectItem value="video/webm">WebM</SelectItem>
                 </SelectContent>
               </Select>
             </div>
