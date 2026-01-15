@@ -1,22 +1,18 @@
 import { useState, useEffect } from "react";
-import { Cloud, Upload, History, Menu } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { BulkUploadZone } from "@/components/BulkUploadZone";
-import { UploadPreview } from "@/components/UploadPreview";
-import { UploadQueue, UploadQueueItem } from "@/components/UploadQueue";
-import { AccountSwitcher } from "@/components/AccountSwitcher";
-import { RecentUploadsPreview } from "@/components/RecentUploadsPreview";
+import { Cloud, Upload, History, Menu, ArrowLeft } from "lucide-react";
+import { UploadsHistory } from "@/components/UploadsHistory";
 import { UploadStats } from "@/components/UploadStats";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { 
   handleOAuthCallback, 
   revokeOAuthSession, 
   restorePersistedSession, 
-  uploadMultipleBlobsWithOAuth,
   getStoredAccounts,
   saveAccount,
   setActiveAccountDid,
@@ -25,13 +21,9 @@ import {
   StoredAccount
 } from "@/lib/oauth";
 
-type UploadPhase = "idle" | "preview" | "uploading" | "complete";
+type ActiveTab = "upload" | "history";
 
-const Index = () => {
-  const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle");
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
-  const [completedCount, setCompletedCount] = useState(0);
+const Uploads = () => {
   const [activeUser, setActiveUser] = useState<StoredAccount | null>(null);
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
@@ -91,7 +83,6 @@ const Index = () => {
       const account = storedAccounts.find(a => a.did === did);
       if (account) {
         setActiveUser(account);
-        resetUploadState();
         setUploadsKey(prev => prev + 1);
         toast({
           title: "Switched account",
@@ -118,7 +109,6 @@ const Index = () => {
         await handleSwitchAccount(remainingAccounts[0].did);
       } else {
         setActiveUser(null);
-        resetUploadState();
       }
     }
     
@@ -128,80 +118,7 @@ const Index = () => {
     });
   };
 
-  const resetUploadState = () => {
-    setUploadPhase("idle");
-    setPendingFiles([]);
-    setUploadQueue([]);
-    setCompletedCount(0);
-  };
-
-  const handleFilesSelect = (files: File[]) => {
-    setPendingFiles(files);
-    setUploadPhase("preview");
-  };
-
-  const handleRemoveFile = (index: number) => {
-    const newFiles = pendingFiles.filter((_, i) => i !== index);
-    if (newFiles.length === 0) {
-      resetUploadState();
-    } else {
-      setPendingFiles(newFiles);
-    }
-  };
-
-  const handleCancelPreview = () => {
-    resetUploadState();
-  };
-
-  const handleStartUpload = async () => {
-    if (!activeUser || pendingFiles.length === 0) return;
-
-    setUploadPhase("uploading");
-    setCompletedCount(0);
-    
-    const initialQueue: UploadQueueItem[] = pendingFiles.map(file => ({
-      file,
-      status: "pending",
-      progress: 0,
-    }));
-    setUploadQueue(initialQueue);
-
-    const { successCount, failedCount } = await uploadMultipleBlobsWithOAuth(
-      activeUser.did,
-      pendingFiles,
-      (index, status, error) => {
-        setUploadQueue(prev => {
-          const newQueue = [...prev];
-          newQueue[index] = {
-            ...newQueue[index],
-            status,
-            progress: status === 'completed' ? 100 : status === 'uploading' ? 50 : 0,
-            error,
-          };
-          return newQueue;
-        });
-        
-        if (status === 'completed' || status === 'failed') {
-          setCompletedCount(prev => prev + 1);
-        }
-      }
-    );
-
-    setUploadPhase("complete");
-    setUploadsKey(prev => prev + 1);
-
-    toast({
-      title: "Upload complete",
-      description: `${successCount} uploaded${failedCount > 0 ? `, ${failedCount} failed` : ''}`,
-      variant: failedCount > 0 ? "destructive" : "default",
-    });
-
-    setTimeout(() => {
-      resetUploadState();
-    }, 3000);
-  };
-
-  const NavItem = ({ active, icon: Icon, label, onClick }: { active?: boolean; icon: typeof Upload; label: string; onClick?: () => void }) => (
+  const NavItem = ({ tab, icon: Icon, label, onClick }: { tab: ActiveTab; icon: typeof Upload; label: string; onClick?: () => void }) => (
     <button
       onClick={() => {
         if (onClick) onClick();
@@ -209,7 +126,7 @@ const Index = () => {
       }}
       className={cn(
         "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all",
-        active 
+        tab === "history" 
           ? "bg-primary text-primary-foreground shadow-md" 
           : "text-muted-foreground hover:bg-muted hover:text-foreground"
       )}
@@ -234,8 +151,8 @@ const Index = () => {
       </div>
       
       <nav className="flex-1 px-4 space-y-2">
-        <NavItem active icon={Upload} label="Upload" />
-        <NavItem icon={History} label="History" onClick={() => navigate('/uploads')} />
+        <NavItem tab="upload" icon={Upload} label="Upload" onClick={() => navigate('/')} />
+        <NavItem tab="history" icon={History} label="History" />
       </nav>
       
       {activeUser && (
@@ -300,9 +217,9 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="flex-1 lg:overflow-auto">
-        <div className="lg:hidden h-16" /> {/* Spacer for mobile header */}
+        <div className="lg:hidden h-16" />
         
-        <div className="max-w-4xl mx-auto p-6 lg:p-10">
+        <div className="max-w-6xl mx-auto p-6 lg:p-10">
           {isRestoringSession ? (
             <div className="flex items-center justify-center min-h-[60vh]">
               <div className="text-center space-y-4">
@@ -316,9 +233,9 @@ const Index = () => {
                 <Cloud className="w-16 h-16 text-primary" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Welcome to ATProto CDN</h2>
+                <h2 className="text-2xl font-bold">Sign in to view uploads</h2>
                 <p className="text-muted-foreground max-w-md">
-                  Sign in with your ATProto account to upload images to your Personal Data Server
+                  Sign in with your ATProto account to view your upload history
                 </p>
               </div>
               <AccountSwitcher 
@@ -327,44 +244,21 @@ const Index = () => {
                 onSwitchAccount={handleSwitchAccount}
                 onLogout={handleLogout}
               />
-              
-              <div className="w-full max-w-2xl mt-12">
-                <RecentUploadsPreview />
-              </div>
             </div>
           ) : (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold mb-1">Upload Files</h2>
-                <p className="text-muted-foreground text-sm">
-                  Upload to @{activeUser.handle}'s PDS
-                </p>
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <h2 className="text-2xl font-bold mb-1">Upload History</h2>
+                  <p className="text-muted-foreground text-sm">
+                    All uploads from @{activeUser.handle}
+                  </p>
+                </div>
               </div>
-              
-              {uploadPhase === "idle" && (
-                <BulkUploadZone 
-                  onFilesSelect={handleFilesSelect} 
-                  isUploading={false}
-                />
-              )}
-
-              {uploadPhase === "preview" && (
-                <UploadPreview
-                  files={pendingFiles}
-                  onUpload={handleStartUpload}
-                  onCancel={handleCancelPreview}
-                  onRemoveFile={handleRemoveFile}
-                  isUploading={false}
-                />
-              )}
-
-              {(uploadPhase === "uploading" || uploadPhase === "complete") && (
-                <UploadQueue
-                  items={uploadQueue}
-                  completedCount={completedCount}
-                  totalCount={pendingFiles.length}
-                />
-              )}
+              <UploadsHistory key={uploadsKey} did={activeUser.did} />
             </div>
           )}
         </div>
@@ -373,4 +267,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default Uploads;

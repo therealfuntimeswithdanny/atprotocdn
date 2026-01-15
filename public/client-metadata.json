@@ -1,8 +1,8 @@
 {
-  "client_id": "https://danny-cdn-magic.lovable.app/client-metadata.json",
+  "client_id": "https://atprotocdn.lovable.app/client-metadata.json",
   "client_name": "ATProto CDN Tool",
-  "client_uri": "https://danny-cdn-magic.lovable.app",
-  "redirect_uris": ["https://danny-cdn-magic.lovable.app/"],
+  "client_uri": "https://atprotocdn.lovable.app",
+  "redirect_uris": ["https://atprotocdn.lovable.app/"],
   "scope": "atproto transition:generic",
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
