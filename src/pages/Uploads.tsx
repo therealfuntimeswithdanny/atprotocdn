@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Cloud, Upload, History, Menu, ArrowLeft } from "lucide-react";
+import { Cloud, Upload, FolderOpen, Menu, ArrowLeft } from "lucide-react";
 import { UploadsHistory } from "@/components/UploadsHistory";
 import { UploadStats } from "@/components/UploadStats";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -152,7 +152,7 @@ const Uploads = () => {
       
       <nav className="flex-1 px-4 space-y-2">
         <NavItem tab="upload" icon={Upload} label="Upload" onClick={() => navigate('/')} />
-        <NavItem tab="history" icon={History} label="History" />
+        <NavItem tab="history" icon={FolderOpen} label="Uploads" />
       </nav>
       
       {activeUser && (
@@ -178,7 +178,7 @@ const Uploads = () => {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-72 border-r border-border flex-col bg-card/50">
+      <aside className="hidden lg:flex w-72 border-r border-border flex-col bg-card/50 sticky top-0 h-screen">
         <SidebarContent />
       </aside>
 
