@@ -66,6 +66,11 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
     return `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${cid}`;
   };
 
+  const getProxiedImageUrl = (cid: string) => {
+    const rawUrl = getBlobUrl(cid);
+    return `https://atimg.madebydanny.uk/?image=${encodeURIComponent(rawUrl)}`;
+  };
+
   const getShareUrl = (id: string) => {
     return `${window.location.origin}/i/${id}`;
   };
@@ -170,7 +175,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
                       </>
                     ) : (
                       <img
-                        src={getBlobUrl(upload.cid)}
+                        src={getProxiedImageUrl(upload.cid)}
                         alt={upload.filename || "Upload"}
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"
