@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Cloud, Upload, FolderOpen, Menu } from "lucide-react";
+import { Cloud, Upload, FolderOpen, Star, Info, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BulkUploadZone } from "@/components/BulkUploadZone";
 import { UploadPreview } from "@/components/UploadPreview";
@@ -236,6 +236,8 @@ const Index = () => {
       <nav className="flex-1 px-4 space-y-2">
         <NavItem active icon={Upload} label="Upload" />
         <NavItem icon={FolderOpen} label="Uploads" onClick={() => navigate('/uploads')} />
+        <NavItem icon={Star} label="Starred" onClick={() => navigate('/starred')} />
+        <NavItem icon={Info} label="About" onClick={() => navigate('/about')} />
       </nav>
       
       {activeUser && (
