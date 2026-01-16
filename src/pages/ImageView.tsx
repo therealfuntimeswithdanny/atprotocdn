@@ -71,14 +71,18 @@ export default function MediaView() {
     fetchUpload();
   }, [id]);
 
-  const mediaUrl = upload && pdsUrl
+  const rawMediaUrl = upload && pdsUrl
     ? `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${upload.user_did}&cid=${upload.blob_cid}`
+    : "";
+
+  const proxiedImageUrl = rawMediaUrl
+    ? `https://atimg.madebydanny.uk/?image=${encodeURIComponent(rawMediaUrl)}`
     : "";
 
   const isVideo = upload ? isVideoMimeType(upload.mime_type) : false;
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(mediaUrl);
+    await navigator.clipboard.writeText(rawMediaUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -138,12 +142,12 @@ export default function MediaView() {
 
         <Card className="overflow-hidden bg-card/50 border-border/50">
           <div className="relative bg-muted/30">
-            {mediaUrl && (
+            {rawMediaUrl && (
               isVideo ? (
                 <div className="relative group">
                   <video
                     ref={videoRef}
-                    src={mediaUrl}
+                    src={rawMediaUrl}
                     className="w-full h-auto max-h-[70vh] object-contain"
                     controls={false}
                     onEnded={() => setIsPlaying(false)}
@@ -190,7 +194,7 @@ export default function MediaView() {
                 </div>
               ) : (
                 <img
-                  src={mediaUrl}
+                  src={proxiedImageUrl}
                   alt={upload.filename || "Uploaded image"}
                   className="w-full h-auto max-h-[70vh] object-contain"
                 />
@@ -218,7 +222,7 @@ export default function MediaView() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={handleCopy} variant="outline" size="sm" disabled={!mediaUrl}>
+              <Button onClick={handleCopy} variant="outline" size="sm" disabled={!rawMediaUrl}>
                 {copied ? (
                   <Check className="mr-2 h-4 w-4" />
                 ) : (
@@ -226,8 +230,8 @@ export default function MediaView() {
                 )}
                 {copied ? "Copied!" : "Copy Link"}
               </Button>
-              {mediaUrl && (
-                <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+              {rawMediaUrl && (
+                <a href={rawMediaUrl} target="_blank" rel="noopener noreferrer">
                   <Button variant="outline" size="sm">
                     <ExternalLink className="mr-2 h-4 w-4" />
                     Open Original
