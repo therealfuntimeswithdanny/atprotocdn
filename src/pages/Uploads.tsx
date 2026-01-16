@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Cloud, Upload, FolderOpen, Menu, ArrowLeft } from "lucide-react";
+import { Cloud, Upload, FolderOpen, Star, Info, Menu, ArrowLeft } from "lucide-react";
 import { UploadsHistory } from "@/components/UploadsHistory";
 import { UploadStats } from "@/components/UploadStats";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -118,7 +118,7 @@ const Uploads = () => {
     });
   };
 
-  const NavItem = ({ tab, icon: Icon, label, onClick }: { tab: ActiveTab; icon: typeof Upload; label: string; onClick?: () => void }) => (
+  const NavItem = ({ tab, icon: Icon, label, onClick }: { tab?: ActiveTab; icon: typeof Upload; label: string; onClick?: () => void }) => (
     <button
       onClick={() => {
         if (onClick) onClick();
@@ -153,6 +153,8 @@ const Uploads = () => {
       <nav className="flex-1 px-4 space-y-2">
         <NavItem tab="upload" icon={Upload} label="Upload" onClick={() => navigate('/')} />
         <NavItem tab="history" icon={FolderOpen} label="Uploads" />
+        <NavItem icon={Star} label="Starred" onClick={() => navigate('/starred')} />
+        <NavItem icon={Info} label="About" onClick={() => navigate('/about')} />
       </nav>
       
       {activeUser && (

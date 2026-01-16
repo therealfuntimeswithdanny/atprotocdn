@@ -7,6 +7,8 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import Index from "./pages/Index";
 import ImageView from "./pages/ImageView";
 import Uploads from "./pages/Uploads";
+import Starred from "./pages/Starred";
+import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,6 +23,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/uploads" element={<Uploads />} />
+            <Route path="/starred" element={<Starred />} />
+            <Route path="/about" element={<About />} />
             <Route path="/i/:id" element={<ImageView />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
