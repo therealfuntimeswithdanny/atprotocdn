@@ -327,10 +327,6 @@ const Index = () => {
                 onSwitchAccount={handleSwitchAccount}
                 onLogout={handleLogout}
               />
-              
-              <div className="w-full max-w-2xl mt-12">
-                <RecentUploadsPreview />
-              </div>
             </div>
           ) : (
             <div className="space-y-6">
@@ -364,6 +360,12 @@ const Index = () => {
                   completedCount={completedCount}
                   totalCount={pendingFiles.length}
                 />
+              )}
+
+              {uploadPhase === "idle" && (
+                <div className="mt-8">
+                  <RecentUploadsPreview userDid={activeUser.did} />
+                </div>
               )}
             </div>
           )}
