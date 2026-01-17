@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Copy, ExternalLink, Check, Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { resolvePdsUrl, isVideoMimeType } from "@/lib/oauth";
-import { useRef } from "react";
+import { StarButton } from "@/components/StarButton";
+import { resolvePdsUrl, isVideoMimeType, getActiveAccountDid } from "@/lib/oauth";
 
 interface UploadData {
   id: string;
@@ -237,6 +237,14 @@ export default function MediaView() {
                     Open Original
                   </Button>
                 </a>
+              )}
+              {getActiveAccountDid() && upload && (
+                <StarButton 
+                  did={getActiveAccountDid()!} 
+                  uploadId={upload.id}
+                  variant="outline"
+                  size="sm"
+                />
               )}
             </div>
           </div>

@@ -14,6 +14,35 @@ export type Database = {
   }
   public: {
     Tables: {
+      starred_uploads: {
+        Row: {
+          created_at: string
+          id: string
+          upload_id: string
+          user_did: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          upload_id: string
+          user_did: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          upload_id?: string
+          user_did?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "starred_uploads_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uploads: {
         Row: {
           blob_cid: string
