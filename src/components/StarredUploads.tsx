@@ -1,42 +1,33 @@
 import { useState, useEffect } from "react";
-import { Copy, Check, ExternalLink, RefreshCw, Share2, ImageOff, Search, Filter, Play, Star } from "lucide-react";
+import { Copy, Check, ExternalLink, RefreshCw, Share2, Star, StarOff, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
-import { fetchUserUploads, resolvePdsUrl, isVideoMimeType } from "@/lib/oauth";
-import { UploadFilters, UploadFiltersState, defaultFilters } from "./UploadFilters";
-import { toggleStar, isUploadStarred } from "@/lib/starring";
+import { resolvePdsUrl, isVideoMimeType } from "@/lib/oauth";
+import { fetchStarredUploads, toggleStar } from "@/lib/starring";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
-interface Upload {
+interface StarredUpload {
   id: string;
   cid: string;
-  uri: string;
   mimeType: string;
   createdAt: string;
   filename: string | null;
   sizeBytes: number;
+  starredAt: string;
 }
 
-interface UploadsHistoryProps {
+interface StarredUploadsProps {
   did: string;
+  refreshKey?: number;
 }
 
-export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
-  const [uploads, setUploads] = useState<Upload[]>([]);
+export const StarredUploads = ({ did, refreshKey = 0 }: StarredUploadsProps) => {
+  const [uploads, setUploads] = useState<StarredUpload[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<UploadFiltersState>(defaultFilters);
   const [pdsUrl, setPdsUrl] = useState<string>("");
-  const [showFilters, setShowFilters] = useState(false);
-  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
-  const [starringId, setStarringId] = useState<string | null>(null);
+  const [unstarringId, setUnstarringId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -49,24 +40,8 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
 
   const loadUploads = async () => {
     setIsLoading(true);
-    const data = await fetchUserUploads(did, {
-      search: filters.search,
-      dateRange: filters.dateRange,
-      mimeType: filters.mimeType,
-      sizeRange: filters.sizeRange,
-      sortBy: filters.sortBy,
-      sortOrder: filters.sortOrder,
-    });
+    const data = await fetchStarredUploads(did);
     setUploads(data);
-    
-    // Check star status for all uploads
-    const starredSet = new Set<string>();
-    await Promise.all(data.map(async (upload) => {
-      const starred = await isUploadStarred(did, upload.id);
-      if (starred) starredSet.add(upload.id);
-    }));
-    setStarredIds(starredSet);
-    
     setIsLoading(false);
   };
 
@@ -74,7 +49,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
     if (pdsUrl) {
       loadUploads();
     }
-  }, [did, filters, pdsUrl]);
+  }, [did, pdsUrl, refreshKey]);
 
   const getBlobUrl = (cid: string) => {
     return `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${cid}`;
@@ -99,62 +74,32 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleStar = async (uploadId: string) => {
-    setStarringId(uploadId);
+  const handleUnstar = async (uploadId: string) => {
+    setUnstarringId(uploadId);
     const result = await toggleStar(did, uploadId);
     
-    if (result.error) {
+    if (!result.starred) {
+      setUploads(prev => prev.filter(u => u.id !== uploadId));
+      toast({
+        title: "Removed from starred",
+        description: "Upload has been unstarred",
+      });
+    } else if (result.error) {
       toast({
         title: "Error",
         description: result.error,
         variant: "destructive",
       });
-    } else {
-      setStarredIds(prev => {
-        const newSet = new Set(prev);
-        if (result.starred) {
-          newSet.add(uploadId);
-        } else {
-          newSet.delete(uploadId);
-        }
-        return newSet;
-      });
-      toast({
-        title: result.starred ? "Starred" : "Unstarred",
-        description: result.starred 
-          ? "Added to your starred uploads" 
-          : "Removed from starred uploads",
-      });
     }
-    setStarringId(null);
+    setUnstarringId(null);
   };
-
-  const hasActiveFilters = filters.search || filters.dateRange !== 'all' || filters.mimeType !== 'all' || filters.sizeRange !== 'all';
 
   return (
     <div className="space-y-4">
-      {/* Search and Filter Bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search uploads..."
-            value={filters.search}
-            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-            className="pl-9 bg-muted/50 border-0"
-          />
-        </div>
-        <Collapsible open={showFilters} onOpenChange={setShowFilters}>
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="icon"
-              className={cn(hasActiveFilters && "border-primary text-primary")}
-            >
-              <Filter className="w-4 h-4" />
-            </Button>
-          </CollapsibleTrigger>
-        </Collapsible>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {uploads.length} starred {uploads.length === 1 ? 'upload' : 'uploads'}
+        </p>
         <Button 
           variant="ghost" 
           size="icon" 
@@ -165,32 +110,21 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
         </Button>
       </div>
 
-      <Collapsible open={showFilters} onOpenChange={setShowFilters}>
-        <CollapsibleContent>
-          <div className="pb-4">
-            <UploadFilters filters={filters} onFiltersChange={setFilters} />
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Grid */}
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {[...Array(8)].map((_, i) => (
+          {[...Array(4)].map((_, i) => (
             <div key={i} className="aspect-square rounded-xl bg-muted animate-pulse" />
           ))}
         </div>
       ) : uploads.length === 0 ? (
         <div className="text-center py-16 space-y-4">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-muted">
-            <ImageOff className="w-8 h-8 text-muted-foreground" />
+            <Star className="w-8 h-8 text-muted-foreground" />
           </div>
           <div className="space-y-1">
-            <p className="font-medium">
-              {hasActiveFilters ? "No uploads match your filters" : "No uploads yet"}
-            </p>
+            <p className="font-medium">No starred uploads yet</p>
             <p className="text-sm text-muted-foreground">
-              {hasActiveFilters ? "Try adjusting your filters" : "Upload an image or video to get started"}
+              Star your favorite uploads to quickly access them here
             </p>
           </div>
         </div>
@@ -226,13 +160,11 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
                       />
                     )}
                     {/* Star indicator */}
-                    {starredIds.has(upload.id) && (
-                      <div className="absolute top-2 right-2">
-                        <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center">
-                          <Star className="w-3.5 h-3.5 text-white fill-white" />
-                        </div>
+                    <div className="absolute top-2 right-2">
+                      <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center">
+                        <Star className="w-3.5 h-3.5 text-white fill-white" />
                       </div>
-                    )}
+                    </div>
                   </div>
                 </Link>
                 <div className="absolute inset-0 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center gap-2 rounded-xl pointer-events-none group-hover:pointer-events-auto">
@@ -263,11 +195,11 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
                   <Button
                     size="sm"
                     variant="secondary"
-                    className={cn("h-9 w-9 p-0", starredIds.has(upload.id) && "text-yellow-500")}
-                    onClick={() => handleStar(upload.id)}
-                    disabled={starringId === upload.id}
+                    className="h-9 w-9 p-0"
+                    onClick={() => handleUnstar(upload.id)}
+                    disabled={unstarringId === upload.id}
                   >
-                    <Star className={cn("w-4 h-4", starredIds.has(upload.id) && "fill-current")} />
+                    <StarOff className="w-4 h-4" />
                   </Button>
                   <Button
                     size="sm"
