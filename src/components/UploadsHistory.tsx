@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { Copy, Check, ExternalLink, RefreshCw, Share2, ImageOff, Search, Filter, Play, Star } from "lucide-react";
+import { Copy, Check, ExternalLink, RefreshCw, Share2, ImageOff, Search, Filter, Play, Star, FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { fetchUserUploads, resolvePdsUrl, isVideoMimeType } from "@/lib/oauth";
 import { UploadFilters, UploadFiltersState, defaultFilters } from "./UploadFilters";
-import { toggleStar, isUploadStarred } from "@/lib/starring";
+import { toggleStar, getStarredSubjectUris } from "@/lib/starring";
+import { AddToFolderButton } from "@/components/AddToFolderButton";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Collapsible,
   CollapsibleContent,
@@ -22,6 +24,7 @@ interface Upload {
   createdAt: string;
   filename: string | null;
   sizeBytes: number;
+  recordUri: string | null;
 }
 
 interface UploadsHistoryProps {
@@ -35,7 +38,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
   const [filters, setFilters] = useState<UploadFiltersState>(defaultFilters);
   const [pdsUrl, setPdsUrl] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
-  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
+  const [starredUris, setStarredUris] = useState<Set<string>>(new Set());
   const [starringId, setStarringId] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -49,23 +52,32 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
 
   const loadUploads = async () => {
     setIsLoading(true);
-    const data = await fetchUserUploads(did, {
-      search: filters.search,
-      dateRange: filters.dateRange,
-      mimeType: filters.mimeType,
-      sizeRange: filters.sizeRange,
-      sortBy: filters.sortBy,
-      sortOrder: filters.sortOrder,
-    });
-    setUploads(data);
     
-    // Check star status for all uploads
-    const starredSet = new Set<string>();
-    await Promise.all(data.map(async (upload) => {
-      const starred = await isUploadStarred(did, upload.id);
-      if (starred) starredSet.add(upload.id);
+    // Fetch uploads with record_uri
+    let query = supabase
+      .from('uploads')
+      .select('*')
+      .eq('user_did', did)
+      .order('created_at', { ascending: false });
+
+    const { data } = await query;
+    
+    const mapped = (data || []).map((upload: any) => ({
+      id: upload.id,
+      cid: upload.blob_cid,
+      uri: '',
+      mimeType: upload.mime_type,
+      createdAt: upload.created_at,
+      filename: upload.filename,
+      sizeBytes: upload.size_bytes,
+      recordUri: upload.record_uri,
     }));
-    setStarredIds(starredSet);
+    
+    setUploads(mapped);
+    
+    // Check star status from PDS
+    const starred = await getStarredSubjectUris(did);
+    setStarredUris(new Set(starred));
     
     setIsLoading(false);
   };
@@ -99,31 +111,29 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleStar = async (uploadId: string) => {
-    setStarringId(uploadId);
-    const result = await toggleStar(did, uploadId);
+  const handleStar = async (upload: Upload) => {
+    if (!upload.recordUri) {
+      toast({ title: "Error", description: "No record URI available for this upload", variant: "destructive" });
+      return;
+    }
+    setStarringId(upload.id);
+    const result = await toggleStar(did, upload.recordUri);
     
     if (result.error) {
-      toast({
-        title: "Error",
-        description: result.error,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: result.error, variant: "destructive" });
     } else {
-      setStarredIds(prev => {
+      setStarredUris(prev => {
         const newSet = new Set(prev);
         if (result.starred) {
-          newSet.add(uploadId);
+          newSet.add(upload.recordUri!);
         } else {
-          newSet.delete(uploadId);
+          newSet.delete(upload.recordUri!);
         }
         return newSet;
       });
       toast({
         title: result.starred ? "Starred" : "Unstarred",
-        description: result.starred 
-          ? "Added to your starred uploads" 
-          : "Removed from starred uploads",
+        description: result.starred ? "Added to starred" : "Removed from starred",
       });
     }
     setStarringId(null);
@@ -133,7 +143,6 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
 
   return (
     <div className="space-y-4">
-      {/* Search and Filter Bar */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -146,21 +155,12 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
         </div>
         <Collapsible open={showFilters} onOpenChange={setShowFilters}>
           <CollapsibleTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="icon"
-              className={cn(hasActiveFilters && "border-primary text-primary")}
-            >
+            <Button variant="outline" size="icon" className={cn(hasActiveFilters && "border-primary text-primary")}>
               <Filter className="w-4 h-4" />
             </Button>
           </CollapsibleTrigger>
         </Collapsible>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={loadUploads}
-          disabled={isLoading}
-        >
+        <Button variant="ghost" size="icon" onClick={loadUploads} disabled={isLoading}>
           <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
         </Button>
       </div>
@@ -173,7 +173,6 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Grid */}
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {[...Array(8)].map((_, i) => (
@@ -186,9 +185,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
             <ImageOff className="w-8 h-8 text-muted-foreground" />
           </div>
           <div className="space-y-1">
-            <p className="font-medium">
-              {hasActiveFilters ? "No uploads match your filters" : "No uploads yet"}
-            </p>
+            <p className="font-medium">{hasActiveFilters ? "No uploads match" : "No uploads yet"}</p>
             <p className="text-sm text-muted-foreground">
               {hasActiveFilters ? "Try adjusting your filters" : "Upload an image or video to get started"}
             </p>
@@ -198,6 +195,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {uploads.map((upload) => {
             const isVideo = isVideoMimeType(upload.mimeType);
+            const isStarred = upload.recordUri ? starredUris.has(upload.recordUri) : false;
             
             return (
               <div key={upload.id} className="group relative">
@@ -205,12 +203,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
                   <div className="aspect-square rounded-xl overflow-hidden bg-muted relative">
                     {isVideo ? (
                       <>
-                        <video
-                          src={getBlobUrl(upload.cid)}
-                          className="w-full h-full object-cover"
-                          muted
-                          preload="metadata"
-                        />
+                        <video src={getBlobUrl(upload.cid)} className="w-full h-full object-cover" muted preload="metadata" />
                         <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                           <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
                             <Play className="w-5 h-5 text-foreground fill-foreground ml-0.5" />
@@ -225,8 +218,7 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
                         loading="lazy"
                       />
                     )}
-                    {/* Star indicator */}
-                    {starredIds.has(upload.id) && (
+                    {isStarred && (
                       <div className="absolute top-2 right-2">
                         <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center">
                           <Star className="w-3.5 h-3.5 text-white fill-white" />
@@ -236,45 +228,32 @@ export const UploadsHistory = ({ did }: UploadsHistoryProps) => {
                   </div>
                 </Link>
                 <div className="absolute inset-0 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center gap-2 rounded-xl pointer-events-none group-hover:pointer-events-auto">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-9 w-9 p-0"
-                    onClick={() => handleCopy(upload.id, 'blob')}
-                  >
-                    {copiedId === `${upload.id}-blob` ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
+                  <Button size="sm" variant="secondary" className="h-9 w-9 p-0" onClick={() => handleCopy(upload.id, 'blob')}>
+                    {copiedId === `${upload.id}-blob` ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-9 w-9 p-0"
-                    onClick={() => handleCopy(upload.id, 'share')}
-                  >
-                    {copiedId === `${upload.id}-share` ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <Share2 className="w-4 h-4" />
-                    )}
+                  <Button size="sm" variant="secondary" className="h-9 w-9 p-0" onClick={() => handleCopy(upload.id, 'share')}>
+                    {copiedId === `${upload.id}-share` ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className={cn("h-9 w-9 p-0", starredIds.has(upload.id) && "text-yellow-500")}
-                    onClick={() => handleStar(upload.id)}
-                    disabled={starringId === upload.id}
-                  >
-                    <Star className={cn("w-4 h-4", starredIds.has(upload.id) && "fill-current")} />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-9 w-9 p-0"
-                    asChild
-                  >
+                  {upload.recordUri && (
+                    <>
+                      <Button
+                        size="sm" variant="secondary"
+                        className={cn("h-9 w-9 p-0", isStarred && "text-yellow-500")}
+                        onClick={() => handleStar(upload)}
+                        disabled={starringId === upload.id}
+                      >
+                        <Star className={cn("w-4 h-4", isStarred && "fill-current")} />
+                      </Button>
+                      <AddToFolderButton
+                        did={did}
+                        subjectUri={upload.recordUri}
+                        size="sm"
+                        variant="secondary"
+                        className="h-9 w-9 p-0"
+                      />
+                    </>
+                  )}
+                  <Button size="sm" variant="secondary" className="h-9 w-9 p-0" asChild>
                     <a href={getBlobUrl(upload.cid)} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="w-4 h-4" />
                     </a>

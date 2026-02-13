@@ -14,66 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      folder_items: {
-        Row: {
-          created_at: string
-          folder_id: string
-          id: string
-          upload_id: string
-        }
-        Insert: {
-          created_at?: string
-          folder_id: string
-          id?: string
-          upload_id: string
-        }
-        Update: {
-          created_at?: string
-          folder_id?: string
-          id?: string
-          upload_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "folder_items_folder_id_fkey"
-            columns: ["folder_id"]
-            isOneToOne: false
-            referencedRelation: "folders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "folder_items_upload_id_fkey"
-            columns: ["upload_id"]
-            isOneToOne: false
-            referencedRelation: "uploads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      folders: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          rkey: string | null
-          user_did: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          rkey?: string | null
-          user_did: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          rkey?: string | null
-          user_did?: string
-        }
-        Relationships: []
-      }
       starred_uploads: {
         Row: {
           created_at: string
@@ -110,6 +50,7 @@ export type Database = {
           filename: string | null
           id: string
           mime_type: string
+          record_uri: string | null
           size_bytes: number
           user_did: string
         }
@@ -119,6 +60,7 @@ export type Database = {
           filename?: string | null
           id?: string
           mime_type: string
+          record_uri?: string | null
           size_bytes: number
           user_did: string
         }
@@ -128,6 +70,7 @@ export type Database = {
           filename?: string | null
           id?: string
           mime_type?: string
+          record_uri?: string | null
           size_bytes?: number
           user_did?: string
         }

@@ -76,6 +76,7 @@ export const AppLayout = ({
         <NavItem path="/" icon={Upload} label="Upload" />
         <NavItem path="/uploads" icon={FolderOpen} label="Uploads" />
         <NavItem path="/starred" icon={Star} label="Starred" />
+        <NavItem path="/folders" icon={FolderOpen} label="Folders" />
         <NavItem path="/about" icon={Info} label="About" />
       </nav>
       

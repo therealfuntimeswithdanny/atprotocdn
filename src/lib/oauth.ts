@@ -310,6 +310,7 @@ export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
       mime_type: file.type,
       size_bytes: file.size,
       filename: file.name,
+      record_uri: recordData.uri,
     })
     .select('id')
     .single();

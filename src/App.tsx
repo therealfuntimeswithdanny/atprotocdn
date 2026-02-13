@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import ImageView from "./pages/ImageView";
 import Uploads from "./pages/Uploads";
 import Starred from "./pages/Starred";
+import Folders from "./pages/Folders";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/uploads" element={<Uploads />} />
             <Route path="/starred" element={<Starred />} />
+            <Route path="/folders" element={<Folders />} />
             <Route path="/about" element={<About />} />
             <Route path="/i/:id" element={<ImageView />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
