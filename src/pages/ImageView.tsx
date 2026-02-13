@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Copy, ExternalLink, Check, Play, Pause, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Copy, ExternalLink, Check, Play, Pause, Volume2, VolumeX, FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { StarButton } from "@/components/StarButton";
+import { AddToFolderButton } from "@/components/AddToFolderButton";
 import { resolvePdsUrl, isVideoMimeType, getActiveAccountDid } from "@/lib/oauth";
 
 interface UploadData {
@@ -16,6 +17,7 @@ interface UploadData {
   size_bytes: number;
   filename: string | null;
   created_at: string;
+  record_uri: string | null;
 }
 
 const formatBytes = (bytes: number): string => {
@@ -238,13 +240,21 @@ export default function MediaView() {
                   </Button>
                 </a>
               )}
-              {getActiveAccountDid() && upload && (
-                <StarButton 
-                  did={getActiveAccountDid()!} 
-                  uploadId={upload.id}
-                  variant="outline"
-                  size="sm"
-                />
+              {getActiveAccountDid() && upload?.record_uri && (
+                <>
+                  <StarButton 
+                    did={getActiveAccountDid()!} 
+                    subjectUri={upload.record_uri}
+                    variant="outline"
+                    size="sm"
+                  />
+                  <AddToFolderButton
+                    did={getActiveAccountDid()!}
+                    subjectUri={upload.record_uri}
+                    variant="outline"
+                    size="sm"
+                  />
+                </>
               )}
             </div>
           </div>

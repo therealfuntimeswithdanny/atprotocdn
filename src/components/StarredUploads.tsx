@@ -1,20 +1,17 @@
 import { useState, useEffect } from "react";
 import { Copy, Check, ExternalLink, RefreshCw, Share2, Star, StarOff, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
 import { resolvePdsUrl, isVideoMimeType } from "@/lib/oauth";
-import { fetchStarredUploads, toggleStar } from "@/lib/starring";
+import { listStarRecords, toggleStar } from "@/lib/starring";
+import { resolveRecordFromUri } from "@/lib/folders";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-interface StarredUpload {
-  id: string;
+interface ResolvedStarredItem {
+  subjectUri: string;
   cid: string;
   mimeType: string;
-  createdAt: string;
-  filename: string | null;
-  sizeBytes: number;
-  starredAt: string;
+  did: string;
 }
 
 interface StarredUploadsProps {
@@ -23,89 +20,76 @@ interface StarredUploadsProps {
 }
 
 export const StarredUploads = ({ did, refreshKey = 0 }: StarredUploadsProps) => {
-  const [uploads, setUploads] = useState<StarredUpload[]>([]);
+  const [items, setItems] = useState<ResolvedStarredItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [pdsUrl, setPdsUrl] = useState<string>("");
-  const [unstarringId, setUnstarringId] = useState<string | null>(null);
+  const [pdsUrl, setPdsUrl] = useState("");
+  const [unstarringUri, setUnstarringUri] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    const resolvePds = async () => {
-      const url = await resolvePdsUrl(did);
-      setPdsUrl(url);
-    };
-    resolvePds();
+    resolvePdsUrl(did).then(setPdsUrl);
   }, [did]);
 
-  const loadUploads = async () => {
+  const loadStarred = async () => {
     setIsLoading(true);
-    const data = await fetchStarredUploads(did);
-    setUploads(data);
+    const stars = await listStarRecords(did);
+
+    const resolved = await Promise.all(
+      stars.map(async (star) => {
+        const record = await resolveRecordFromUri(star.value.subject);
+        if (!record) return null;
+        return {
+          subjectUri: star.value.subject,
+          cid: record.cid,
+          mimeType: record.mimeType,
+          did: record.did,
+        };
+      })
+    );
+
+    setItems(resolved.filter(Boolean) as ResolvedStarredItem[]);
     setIsLoading(false);
   };
 
   useEffect(() => {
-    if (pdsUrl) {
-      loadUploads();
-    }
-  }, [did, pdsUrl, refreshKey]);
+    loadStarred();
+  }, [did, refreshKey]);
 
-  const getBlobUrl = (cid: string) => {
-    return `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${cid}`;
-  };
+  const getBlobUrl = (itemDid: string, cid: string) =>
+    `${pdsUrl}/xrpc/com.atproto.sync.getBlob?did=${itemDid}&cid=${cid}`;
 
-  const getProxiedImageUrl = (cid: string) => {
-    const rawUrl = getBlobUrl(cid);
+  const getProxiedImageUrl = (itemDid: string, cid: string) => {
+    const rawUrl = getBlobUrl(itemDid, cid);
     return `https://atimg.madebydanny.uk/?image=${encodeURIComponent(rawUrl)}`;
   };
 
-  const getShareUrl = (id: string) => {
-    return `${window.location.origin}/i/${id}`;
-  };
-
-  const handleCopy = async (id: string, type: 'blob' | 'share') => {
-    const upload = uploads.find(u => u.id === id);
-    if (!upload) return;
-    
-    const url = type === 'blob' ? getBlobUrl(upload.cid) : getShareUrl(id);
+  const handleCopy = async (item: ResolvedStarredItem) => {
+    const url = getBlobUrl(item.did, item.cid);
     await navigator.clipboard.writeText(url);
-    setCopiedId(`${id}-${type}`);
+    setCopiedId(item.subjectUri);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleUnstar = async (uploadId: string) => {
-    setUnstarringId(uploadId);
-    const result = await toggleStar(did, uploadId);
-    
+  const handleUnstar = async (subjectUri: string) => {
+    setUnstarringUri(subjectUri);
+    const result = await toggleStar(did, subjectUri);
     if (!result.starred) {
-      setUploads(prev => prev.filter(u => u.id !== uploadId));
-      toast({
-        title: "Removed from starred",
-        description: "Upload has been unstarred",
-      });
+      setItems(prev => prev.filter(i => i.subjectUri !== subjectUri));
+      toast({ title: "Removed from starred" });
     } else if (result.error) {
-      toast({
-        title: "Error",
-        description: result.error,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: result.error, variant: "destructive" });
     }
-    setUnstarringId(null);
+    setUnstarringUri(null);
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {uploads.length} starred {uploads.length === 1 ? 'upload' : 'uploads'}
+          {items.length} starred {items.length === 1 ? 'upload' : 'uploads'}
         </p>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={loadUploads}
-          disabled={isLoading}
-        >
+        <Button variant="ghost" size="icon" onClick={loadStarred} disabled={isLoading}>
           <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
         </Button>
       </div>
@@ -116,7 +100,7 @@ export const StarredUploads = ({ did, refreshKey = 0 }: StarredUploadsProps) => 
             <div key={i} className="aspect-square rounded-xl bg-muted animate-pulse" />
           ))}
         </div>
-      ) : uploads.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="text-center py-16 space-y-4">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-muted">
             <Star className="w-8 h-8 text-muted-foreground" />
@@ -130,91 +114,55 @@ export const StarredUploads = ({ did, refreshKey = 0 }: StarredUploadsProps) => 
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {uploads.map((upload) => {
-            const isVideo = isVideoMimeType(upload.mimeType);
-            
+          {items.map((item) => {
+            const isVideo = isVideoMimeType(item.mimeType);
             return (
-              <div key={upload.id} className="group relative">
-                <Link to={`/i/${upload.id}`}>
-                  <div className="aspect-square rounded-xl overflow-hidden bg-muted relative">
-                    {isVideo ? (
-                      <>
-                        <video
-                          src={getBlobUrl(upload.cid)}
-                          className="w-full h-full object-cover"
-                          muted
-                          preload="metadata"
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                          <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
-                            <Play className="w-5 h-5 text-foreground fill-foreground ml-0.5" />
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <img
-                        src={getProxiedImageUrl(upload.cid)}
-                        alt={upload.filename || "Upload"}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy"
+              <div key={item.subjectUri} className="group relative">
+                <div className="aspect-square rounded-xl overflow-hidden bg-muted relative">
+                  {isVideo ? (
+                    <>
+                      <video
+                        src={getBlobUrl(item.did, item.cid)}
+                        className="w-full h-full object-cover"
+                        muted preload="metadata"
                       />
-                    )}
-                    {/* Star indicator */}
-                    <div className="absolute top-2 right-2">
-                      <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center">
-                        <Star className="w-3.5 h-3.5 text-white fill-white" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
+                          <Play className="w-5 h-5 text-foreground fill-foreground ml-0.5" />
+                        </div>
                       </div>
+                    </>
+                  ) : (
+                    <img
+                      src={getProxiedImageUrl(item.did, item.cid)}
+                      alt="Starred upload"
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  )}
+                  <div className="absolute top-2 right-2">
+                    <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center">
+                      <Star className="w-3.5 h-3.5 text-white fill-white" />
                     </div>
                   </div>
-                </Link>
+                </div>
                 <div className="absolute inset-0 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center gap-2 rounded-xl pointer-events-none group-hover:pointer-events-auto">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-9 w-9 p-0"
-                    onClick={() => handleCopy(upload.id, 'blob')}
-                  >
-                    {copiedId === `${upload.id}-blob` ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
+                  <Button size="sm" variant="secondary" className="h-9 w-9 p-0" onClick={() => handleCopy(item)}>
+                    {copiedId === item.subjectUri ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </Button>
                   <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-9 w-9 p-0"
-                    onClick={() => handleCopy(upload.id, 'share')}
-                  >
-                    {copiedId === `${upload.id}-share` ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <Share2 className="w-4 h-4" />
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-9 w-9 p-0"
-                    onClick={() => handleUnstar(upload.id)}
-                    disabled={unstarringId === upload.id}
+                    size="sm" variant="secondary" className="h-9 w-9 p-0"
+                    onClick={() => handleUnstar(item.subjectUri)}
+                    disabled={unstarringUri === item.subjectUri}
                   >
                     <StarOff className="w-4 h-4" />
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-9 w-9 p-0"
-                    asChild
-                  >
-                    <a href={getBlobUrl(upload.cid)} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="secondary" className="h-9 w-9 p-0" asChild>
+                    <a href={getBlobUrl(item.did, item.cid)} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="w-4 h-4" />
                     </a>
                   </Button>
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground truncate">
-                  {upload.filename || new Date(upload.createdAt).toLocaleDateString()}
-                </p>
               </div>
             );
           })}

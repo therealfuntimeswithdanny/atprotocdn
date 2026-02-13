@@ -7,8 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface StarButtonProps {
   did: string;
-  uploadId: string;
-  subjectUri?: string;
+  subjectUri: string;
   size?: "sm" | "default" | "lg" | "icon";
   variant?: "default" | "ghost" | "outline" | "secondary";
   className?: string;
@@ -16,8 +15,7 @@ interface StarButtonProps {
 
 export const StarButton = ({ 
   did, 
-  uploadId, 
-  subjectUri = '',
+  subjectUri,
   size = "icon",
   variant = "ghost",
   className,
@@ -30,46 +28,38 @@ export const StarButton = ({
   useEffect(() => {
     const checkStarStatus = async () => {
       setIsLoading(true);
-      const starred = await isUploadStarred(did, uploadId);
+      const starred = await isUploadStarred(did, subjectUri);
       setIsStarred(starred);
       setIsLoading(false);
     };
     
-    if (did && uploadId) {
+    if (did && subjectUri) {
       checkStarStatus();
+    } else {
+      setIsLoading(false);
     }
-  }, [did, uploadId]);
+  }, [did, subjectUri]);
 
   const handleToggle = async () => {
+    if (!subjectUri) return;
     setIsToggling(true);
-    const result = await toggleStar(did, uploadId, subjectUri);
+    const result = await toggleStar(did, subjectUri);
     
     if (result.error) {
-      toast({
-        title: "Error",
-        description: result.error,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: result.error, variant: "destructive" });
     } else {
       setIsStarred(result.starred);
       toast({
         title: result.starred ? "Starred" : "Unstarred",
-        description: result.starred 
-          ? "Added to your starred uploads" 
-          : "Removed from starred uploads",
+        description: result.starred ? "Added to starred" : "Removed from starred",
       });
     }
     setIsToggling(false);
   };
 
-  if (isLoading) {
+  if (isLoading || !subjectUri) {
     return (
-      <Button 
-        size={size} 
-        variant={variant} 
-        className={className}
-        disabled
-      >
+      <Button size={size} variant={variant} className={className} disabled>
         <Star className="w-4 h-4" />
       </Button>
     );
@@ -79,10 +69,7 @@ export const StarButton = ({
     <Button 
       size={size} 
       variant={variant} 
-      className={cn(
-        className,
-        isStarred && "text-yellow-500 hover:text-yellow-600"
-      )}
+      className={cn(className, isStarred && "text-yellow-500 hover:text-yellow-600")}
       onClick={handleToggle}
       disabled={isToggling}
     >
