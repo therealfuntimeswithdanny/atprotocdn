@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Cloud } from "lucide-react";
+import { Cloud, Plus } from "lucide-react";
 import { BulkUploadZone } from "@/components/BulkUploadZone";
 import { UploadPreview } from "@/components/UploadPreview";
 import { UploadQueue, UploadQueueItem } from "@/components/UploadQueue";
@@ -102,23 +102,21 @@ const Index = () => {
       onLogout={handleLogout}
       uploadsKey={uploadsKey}
     >
-      <div className="max-w-4xl mx-auto p-6 lg:p-10">
+      <div className="p-4 lg:p-8">
         {isRestoringSession ? (
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center space-y-4">
-              <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
-              <p className="text-muted-foreground">Restoring session...</p>
+              <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
+              <p className="text-sm text-muted-foreground">Restoring session...</p>
             </div>
           </div>
         ) : !activeUser ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
-            <div className="bg-gradient-to-br from-primary/20 to-primary/5 p-8 rounded-full">
-              <Cloud className="w-16 h-16 text-primary" />
-            </div>
+            <Cloud className="w-20 h-20 text-primary" />
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold">Welcome to ATProto CDN</h2>
-              <p className="text-muted-foreground max-w-md">
-                Sign in with your ATProto account to upload images to your Personal Data Server
+              <h2 className="text-2xl font-normal text-foreground">Welcome to ATProto CDN</h2>
+              <p className="text-muted-foreground max-w-md text-sm">
+                Sign in with your ATProto account to upload and manage files on your Personal Data Server
               </p>
             </div>
             <AccountSwitcher 
@@ -129,19 +127,15 @@ const Index = () => {
             />
           </div>
         ) : (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold mb-1">Upload Files</h2>
-              <p className="text-muted-foreground text-sm">
-                Upload to @{activeUser.handle}'s PDS
-              </p>
-            </div>
-            
+          <div className="space-y-6 max-w-5xl">
             {uploadPhase === "idle" && (
-              <BulkUploadZone 
-                onFilesSelect={handleFilesSelect} 
-                isUploading={false}
-              />
+              <>
+                <BulkUploadZone 
+                  onFilesSelect={handleFilesSelect} 
+                  isUploading={false}
+                />
+                <RecentUploadsPreview userDid={activeUser.did} />
+              </>
             )}
 
             {uploadPhase === "preview" && (
@@ -160,12 +154,6 @@ const Index = () => {
                 completedCount={completedCount}
                 totalCount={pendingFiles.length}
               />
-            )}
-
-            {uploadPhase === "idle" && (
-              <div className="mt-8">
-                <RecentUploadsPreview userDid={activeUser.did} />
-              </div>
             )}
           </div>
         )}
