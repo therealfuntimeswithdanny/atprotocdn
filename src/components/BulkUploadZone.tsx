@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Upload, Cloud, Images, ImagePlus, Film } from "lucide-react";
+import { Plus, ImagePlus, Film } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BulkUploadZoneProps {
@@ -67,11 +67,10 @@ export const BulkUploadZone = ({ onFilesSelect, isUploading, disabled }: BulkUpl
   return (
     <div
       className={cn(
-        "relative rounded-2xl border-2 border-dashed transition-all duration-300",
-        "bg-gradient-to-b from-muted/50 to-muted/20",
+        "relative rounded-2xl border-2 border-dashed transition-all duration-200",
         isDragging 
-          ? "border-primary bg-primary/5 scale-[1.02]" 
-          : "border-border hover:border-muted-foreground/50",
+          ? "border-primary bg-sidebar-accent" 
+          : "border-border hover:border-muted-foreground/40 bg-card",
         isDisabled && "opacity-50 pointer-events-none"
       )}
       onDragEnter={handleDragIn}
@@ -79,52 +78,23 @@ export const BulkUploadZone = ({ onFilesSelect, isUploading, disabled }: BulkUpl
       onDragOver={handleDrag}
       onDrop={handleDrop}
     >
-      <label className="flex flex-col items-center justify-center py-20 px-8 cursor-pointer">
+      <label className="flex flex-col items-center justify-center py-16 px-8 cursor-pointer">
         <div className={cn(
-          "relative mb-6 p-6 rounded-2xl transition-all duration-300",
-          isDragging 
-            ? "bg-primary scale-110" 
-            : "bg-muted"
+          "mb-4 p-4 rounded-full transition-colors",
+          isDragging ? "bg-primary/10" : "bg-secondary"
         )}>
-          <div className="flex items-center gap-2">
-            <ImagePlus className={cn(
-              "w-8 h-8 transition-colors",
-              isDragging ? "text-primary-foreground" : "text-muted-foreground"
-            )} />
-            <Film className={cn(
-              "w-8 h-8 transition-colors",
-              isDragging ? "text-primary-foreground" : "text-muted-foreground"
-            )} />
-          </div>
+          <Plus className={cn(
+            "w-10 h-10",
+            isDragging ? "text-primary" : "text-muted-foreground"
+          )} />
         </div>
 
-        <h3 className="text-xl font-semibold mb-2 text-foreground">
-          {isUploading ? "Uploading..." : "Drop images or videos here"}
-        </h3>
-        <p className="text-sm text-muted-foreground mb-6">
-          or click to browse your files
+        <p className="text-sm text-foreground font-medium mb-1">
+          {isUploading ? "Uploading..." : "Drop files here or click to upload"}
         </p>
-        
-        <div className="flex flex-wrap gap-2 justify-center">
-          <span className="px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
-            JPG
-          </span>
-          <span className="px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
-            PNG
-          </span>
-          <span className="px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
-            GIF
-          </span>
-          <span className="px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
-            WebP
-          </span>
-          <span className="px-3 py-1 rounded-full bg-primary/10 text-xs text-primary font-medium">
-            MP4
-          </span>
-          <span className="px-3 py-1 rounded-full bg-primary/10 text-xs text-primary font-medium">
-            WebM
-          </span>
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Images and videos up to any size
+        </p>
 
         <input
           type="file"

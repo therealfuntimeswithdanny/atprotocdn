@@ -1,16 +1,13 @@
 import { useState } from "react";
-import { Cloud, ArrowLeft, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { StarredUploads } from "@/components/StarredUploads";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { AppLayout } from "@/components/AppLayout";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
 const Starred = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const { activeUser, accounts, isRestoringSession, handleSwitchAccount, handleLogout } = useAuth();
-  const navigate = useNavigate();
 
   return (
     <AppLayout
@@ -19,22 +16,20 @@ const Starred = () => {
       onSwitchAccount={handleSwitchAccount}
       onLogout={handleLogout}
     >
-      <div className="max-w-6xl mx-auto p-6 lg:p-10">
+      <div className="p-4 lg:p-8">
         {isRestoringSession ? (
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center space-y-4">
-              <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
-              <p className="text-muted-foreground">Restoring session...</p>
+              <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
+              <p className="text-sm text-muted-foreground">Restoring session...</p>
             </div>
           </div>
         ) : !activeUser ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
-            <div className="bg-gradient-to-br from-primary/20 to-primary/5 p-8 rounded-full">
-              <Star className="w-16 h-16 text-primary" />
-            </div>
+            <Star className="w-16 h-16 text-primary" />
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold">Sign in to view starred</h2>
-              <p className="text-muted-foreground max-w-md">
+              <h2 className="text-xl font-normal">Sign in to view starred</h2>
+              <p className="text-sm text-muted-foreground max-w-md">
                 Sign in with your ATProto account to view your starred uploads
               </p>
             </div>
@@ -46,18 +41,8 @@ const Starred = () => {
             />
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <h2 className="text-2xl font-bold mb-1">Starred</h2>
-                <p className="text-muted-foreground text-sm">
-                  Your favorite uploads
-                </p>
-              </div>
-            </div>
+          <div className="space-y-4">
+            <h2 className="text-lg font-medium text-foreground">Starred</h2>
             <StarredUploads key={refreshKey} did={activeUser.did} refreshKey={refreshKey} />
           </div>
         )}
