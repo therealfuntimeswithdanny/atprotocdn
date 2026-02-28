@@ -21,7 +21,7 @@ interface BlobData {
 
 interface FileRecord {
   blob: BlobData;
-  $type: 'uk.madebydanny.cdn.img';
+  $type: 'net.blueat.drive.img';
   langs: string[];
   createdAt: string;
 }
@@ -77,7 +77,7 @@ async function createRecord(accessToken: string, blobData: BlobData, pdsUrl: str
   
   const record: FileRecord = {
     blob: blobData,
-    $type: 'uk.madebydanny.cdn.img',
+    $type: 'net.blueat.drive.img',
     langs: ['en'],
     createdAt: new Date().toISOString(),
   };
@@ -90,7 +90,7 @@ async function createRecord(accessToken: string, blobData: BlobData, pdsUrl: str
     },
     body: JSON.stringify({
       repo: did,
-      collection: 'uk.madebydanny.cdn.img',
+      collection: 'net.blueat.drive.img',
       record: record,
     }),
   });
