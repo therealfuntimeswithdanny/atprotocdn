@@ -64,7 +64,7 @@ export const AppLayout = ({
       <div className="p-4 pb-2">
         <div className="flex items-center gap-2 px-2 mb-4">
           <HardDrive className="w-8 h-8 text-primary" />
-          <span className="text-[22px] font-normal text-foreground">CDN</span>
+          <span className="text-[22px] font-normal text-foreground">BlueAT Drive</span>
         </div>
 
         {activeUser && (
@@ -124,7 +124,7 @@ export const AppLayout = ({
 
             <div className="lg:hidden flex items-center gap-2 mr-2">
               <HardDrive className="w-6 h-6 text-primary" />
-              <span className="font-normal text-lg text-foreground">CDN</span>
+              <span className="font-normal text-lg text-foreground">BlueAT Drive</span>
             </div>
 
             {/* Search Bar */}
@@ -132,7 +132,7 @@ export const AppLayout = ({
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
-                  placeholder="Search in CDN"
+                  placeholder="Search in BlueAT Drive"
                   className="pl-11 h-12 rounded-full bg-secondary border-0 focus-visible:bg-card focus-visible:shadow-md focus-visible:ring-1 focus-visible:ring-border text-sm"
                 />
               </div>

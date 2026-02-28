@@ -1,8 +1,8 @@
 {
-  "client_id": "https://atprotocdn.lovable.app/client-metadata.json",
-  "client_name": "ATProto CDN Tool",
-  "client_uri": "https://atprotocdn.lovable.app",
-  "redirect_uris": ["https://atprotocdn.lovable.app/"],
+  "client_id": "https://drive.blueat.net/client-metadata.json",
+  "client_name": "BlueAT Drive",
+  "client_uri": "https://drive.blueat.net",
+  "redirect_uris": ["https://drive.blueat.net/"],
   "scope": "atproto transition:generic",
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
