@@ -1,6 +1,6 @@
 import { getOAuthClient, resolvePdsUrl } from './oauth';
 
-const STAR_COLLECTION = 'uk.madebydanny.cdn.star';
+const STAR_COLLECTION = 'net.blueat.drive.star';
 
 export interface StarRecord {
   $type: string;

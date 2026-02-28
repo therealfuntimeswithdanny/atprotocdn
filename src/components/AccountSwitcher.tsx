@@ -59,7 +59,7 @@ export const AccountSwitcher = ({ activeUser, accounts, onSwitchAccount, onLogou
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl">Sign in with ATProto</DialogTitle>
+            <DialogTitle className="text-xl">Sign in with BlueAT</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddAccount} className="space-y-4 pt-4">
             <div className="space-y-2">

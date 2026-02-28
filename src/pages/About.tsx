@@ -16,14 +16,14 @@ const About = () => {
       <div className="max-w-3xl mx-auto p-6 lg:p-10 space-y-8">
         <div>
           <h2 className="text-2xl font-bold mb-2">About</h2>
-          <p className="text-muted-foreground">Learn more about ATProto CDN</p>
+          <p className="text-muted-foreground">Learn more about BlueAT Drive</p>
         </div>
 
         <Card className="p-6 space-y-6">
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">What is ATProto CDN?</h3>
+            <h3 className="text-lg font-semibold">What is BlueAT Drive?</h3>
             <p className="text-muted-foreground leading-relaxed">
-              ATProto CDN is a decentralized content delivery network built on the AT Protocol. 
+              BlueAT Drive is a decentralized media drive built on the AT Protocol. 
               It allows you to upload and share images and videos using your Bluesky account, 
               with files stored directly on your Personal Data Server (PDS).
             </p>

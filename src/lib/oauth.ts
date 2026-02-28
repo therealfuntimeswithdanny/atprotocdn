@@ -4,6 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 const ACCOUNTS_STORAGE_KEY = 'atproto-accounts';
 const ACTIVE_ACCOUNT_KEY = 'atproto-active-did';
 
+const LEGACY_COLLECTION_PREFIXES = ['uk.madebydanny.cdn', 'uk.madebydanny.dcn'] as const;
+const NEW_COLLECTION_PREFIX = 'net.blueat.drive';
+
 export interface StoredAccount {
   did: string;
   handle: string;
@@ -15,16 +18,16 @@ let oauthClient: BrowserOAuthClient | null = null;
 export const getOAuthClient = () => {
   if (!oauthClient) {
     const origin = window.location.origin;
-    const redirectUri = `${origin}/`;
-    const clientId = `${origin}/client-metadata.json`;
+    const redirectUri = 'https://drive.blueat.net/';
+    const clientId = 'https://drive.blueat.net/client-metadata.json';
     
     oauthClient = new BrowserOAuthClient({
       // Use the public Bluesky handle resolver to support any PDS
       handleResolver: 'https://bsky.social',
       clientMetadata: {
         client_id: clientId,
-        client_name: 'ATProto CDN Tool',
-        client_uri: origin,
+        client_name: 'BlueAT Drive',
+        client_uri: 'https://drive.blueat.net',
         redirect_uris: [redirectUri],
         scope: 'atproto transition:generic',
         response_types: ['code'],
@@ -273,7 +276,7 @@ export const uploadBlobWithOAuth = async (did: string, file: File): Promise<{
   
   // Determine the record type based on file type
   const isVideo = isVideoFile(file);
-  const recordType = isVideo ? 'uk.madebydanny.cdn.video' : 'uk.madebydanny.cdn.img';
+  const recordType = isVideo ? 'net.blueat.drive.video' : 'net.blueat.drive.img';
   
   const record = {
     blob: blobData.blob,
@@ -358,6 +361,154 @@ export interface UploadFiltersParams {
   sortBy?: 'date' | 'size' | 'name';
   sortOrder?: 'asc' | 'desc';
 }
+
+
+interface PdsListRecord {
+  uri: string;
+  value: Record<string, unknown>;
+}
+
+interface PdsListRecordsResponse {
+  records?: PdsListRecord[];
+  cursor?: string;
+}
+
+interface OAuthSessionLike {
+  fetchHandler: (input: string, init?: RequestInit) => Promise<Response>;
+}
+
+const legacyCollectionToNew = (collection: string): string => {
+  for (const prefix of LEGACY_COLLECTION_PREFIXES) {
+    if (collection.startsWith(`${prefix}.`)) {
+      return collection.replace(prefix, NEW_COLLECTION_PREFIX);
+    }
+  }
+  return collection;
+};
+
+const migrateLegacyUri = (uri: string): string => {
+  if (!uri.startsWith('at://')) return uri;
+  const parts = uri.replace('at://', '').split('/');
+  if (parts.length < 3) return uri;
+
+  const [uriDid, collection, rkey] = parts;
+  const newCollection = legacyCollectionToNew(collection);
+  if (newCollection === collection) return uri;
+
+  return `at://${uriDid}/${newCollection}/${rkey}`;
+};
+
+const listRecordsForCollection = async (
+  pdsUrl: string,
+  did: string,
+  collection: string,
+  limit = '100'
+): Promise<PdsListRecord[]> => {
+  const all: PdsListRecord[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const params = new URLSearchParams({
+      repo: did,
+      collection,
+      limit,
+    });
+
+    if (cursor) params.set('cursor', cursor);
+
+    const response = await fetch(`${pdsUrl}/xrpc/com.atproto.repo.listRecords?${params.toString()}`);
+    if (!response.ok) break;
+
+    const data = (await response.json()) as PdsListRecordsResponse;
+    all.push(...(data.records || []));
+    cursor = data.cursor;
+  } while (cursor && limit !== '1');
+
+  return all;
+};
+
+const upsertMigratedRecord = async (
+  session: OAuthSessionLike,
+  pdsUrl: string,
+  did: string,
+  collection: string,
+  rkey: string,
+  record: Record<string, unknown>
+) => {
+  await session.fetchHandler(`${pdsUrl}/xrpc/com.atproto.repo.putRecord`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      repo: did,
+      collection,
+      rkey,
+      record,
+    }),
+  });
+};
+
+export const hasLegacyRecords = async (did: string): Promise<boolean> => {
+  const pdsUrl = await resolvePdsUrl(did);
+
+  for (const prefix of LEGACY_COLLECTION_PREFIXES) {
+    for (const suffix of ['img', 'video', 'star', 'folder']) {
+      const records = await listRecordsForCollection(pdsUrl, did, `${prefix}.${suffix}`, '1');
+      if (records.length > 0) return true;
+    }
+  }
+
+  return false;
+};
+
+export const migrateLegacyRecords = async (did: string): Promise<{
+  success: boolean;
+  migratedCount: number;
+  errors: string[];
+}> => {
+  const client = getOAuthClient();
+  const session = await client.restore(did);
+  if (!session) {
+    return { success: false, migratedCount: 0, errors: ['No active session'] };
+  }
+
+  const pdsUrl = await resolvePdsUrl(did);
+  let migratedCount = 0;
+  const errors: string[] = [];
+
+  for (const prefix of LEGACY_COLLECTION_PREFIXES) {
+    for (const suffix of ['img', 'video', 'star', 'folder']) {
+      const legacyCollection = `${prefix}.${suffix}`;
+      const newCollection = `${NEW_COLLECTION_PREFIX}.${suffix}`;
+      const records = await listRecordsForCollection(pdsUrl, did, legacyCollection);
+
+      for (const recordEntry of records) {
+        const rkey = recordEntry.uri.split('/').pop();
+        if (!rkey) continue;
+
+        const migratedRecord = { ...(recordEntry.value || {}) };
+        migratedRecord.$type = newCollection;
+
+        if (suffix === 'star' && typeof migratedRecord.subject === 'string') {
+          migratedRecord.subject = migrateLegacyUri(migratedRecord.subject);
+        }
+
+        if (suffix === 'folder' && Array.isArray(migratedRecord.items)) {
+          migratedRecord.items = migratedRecord.items.map((uri: string) => migrateLegacyUri(uri));
+        }
+
+        try {
+          await upsertMigratedRecord(session, pdsUrl, did, newCollection, rkey, migratedRecord);
+          migratedCount++;
+        } catch (error) {
+          errors.push(`Failed to migrate ${recordEntry.uri}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+    }
+  }
+
+  return { success: errors.length === 0, migratedCount, errors };
+};
+
 
 // Fetch all uploads for a user with filtering
 export const fetchUserUploads = async (did: string, filters?: UploadFiltersParams): Promise<{
