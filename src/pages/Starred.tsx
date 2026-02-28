@@ -30,7 +30,7 @@ const Starred = () => {
             <div className="space-y-2">
               <h2 className="text-xl font-normal">Sign in to view starred</h2>
               <p className="text-sm text-muted-foreground max-w-md">
-                Sign in with your ATProto account to view your starred uploads
+                Sign in with your BlueAT account to view your starred uploads
               </p>
             </div>
             <AccountSwitcher 

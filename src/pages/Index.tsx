@@ -114,9 +114,9 @@ const Index = () => {
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
             <Cloud className="w-20 h-20 text-primary" />
             <div className="space-y-2">
-              <h2 className="text-2xl font-normal text-foreground">Welcome to ATProto CDN</h2>
+              <h2 className="text-2xl font-normal text-foreground">Welcome to BlueAT Drive</h2>
               <p className="text-muted-foreground max-w-md text-sm">
-                Sign in with your ATProto account to upload and manage files on your Personal Data Server
+                Sign in with your ATProto account to upload and manage files in BlueAT Drive
               </p>
             </div>
             <AccountSwitcher 

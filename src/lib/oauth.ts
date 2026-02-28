@@ -15,16 +15,16 @@ let oauthClient: BrowserOAuthClient | null = null;
 export const getOAuthClient = () => {
   if (!oauthClient) {
     const origin = window.location.origin;
-    const redirectUri = `${origin}/`;
-    const clientId = `${origin}/client-metadata.json`;
+    const redirectUri = 'https://drive.blueat.net/';
+    const clientId = 'https://drive.blueat.net/client-metadata.json';
     
     oauthClient = new BrowserOAuthClient({
       // Use the public Bluesky handle resolver to support any PDS
       handleResolver: 'https://bsky.social',
       clientMetadata: {
         client_id: clientId,
-        client_name: 'ATProto CDN Tool',
-        client_uri: origin,
+        client_name: 'BlueAT Drive',
+        client_uri: 'https://drive.blueat.net',
         redirect_uris: [redirectUri],
         scope: 'atproto transition:generic',
         response_types: ['code'],

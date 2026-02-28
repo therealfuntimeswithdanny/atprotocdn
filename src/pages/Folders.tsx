@@ -30,7 +30,7 @@ const Folders = () => {
             <div className="space-y-2">
               <h2 className="text-xl font-normal">Sign in to view folders</h2>
               <p className="text-sm text-muted-foreground max-w-md">
-                Sign in with your ATProto account to manage your folders
+                Sign in with your BlueAT account to manage your folders
               </p>
             </div>
             <AccountSwitcher 
