@@ -1,6 +1,6 @@
 import { getOAuthClient, resolvePdsUrl } from './oauth';
 
-const FOLDER_COLLECTION = 'uk.madebydanny.cdn.folder';
+const FOLDER_COLLECTION = 'net.blueat.drive.folder';
 
 export interface FolderRecord {
   $type: string;
