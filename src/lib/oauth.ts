@@ -447,6 +447,24 @@ const upsertMigratedRecord = async (
   });
 };
 
+const deleteLegacyRecord = async (
+  session: OAuthSessionLike,
+  pdsUrl: string,
+  did: string,
+  collection: string,
+  rkey: string
+) => {
+  await session.fetchHandler(`${pdsUrl}/xrpc/com.atproto.repo.deleteRecord`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      repo: did,
+      collection,
+      rkey,
+    }),
+  });
+};
+
 export const hasLegacyRecords = async (did: string): Promise<boolean> => {
   const pdsUrl = await resolvePdsUrl(did);
 
@@ -498,6 +516,7 @@ export const migrateLegacyRecords = async (did: string): Promise<{
 
         try {
           await upsertMigratedRecord(session, pdsUrl, did, newCollection, rkey, migratedRecord);
+          await deleteLegacyRecord(session, pdsUrl, did, legacyCollection, rkey);
           migratedCount++;
         } catch (error) {
           errors.push(`Failed to migrate ${recordEntry.uri}: ${error instanceof Error ? error.message : 'Unknown error'}`);
