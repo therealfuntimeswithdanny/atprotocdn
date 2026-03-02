@@ -84,6 +84,11 @@ export const AuthButton = ({ user, onLogout }: AuthButtonProps) => {
           <DialogTitle>Login with OAuth</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleLogin} className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            You'll be redirected to Bluesky to authorize BlueAT Drive. Bluesky may show broad wording
+            (likes/posts/reports), but this app only uses access needed to upload files and manage your
+            BlueAT Drive records (stars/folders/migration).
+          </p>
           <div className="space-y-2">
             <Label htmlFor="handle">Handle or DID</Label>
             <Input

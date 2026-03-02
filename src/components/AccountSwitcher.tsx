@@ -62,6 +62,10 @@ export const AccountSwitcher = ({ activeUser, accounts, onSwitchAccount, onLogou
             <DialogTitle className="text-xl">Sign in with BlueAT</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddAccount} className="space-y-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              You'll continue on Bluesky's OAuth page. It may mention general account actions, but
+              BlueAT Drive only uses access needed for uploads and your drive records.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="handle" className="text-sm font-medium">
                 Handle or DID
@@ -156,6 +160,10 @@ export const AccountSwitcher = ({ activeUser, accounts, onSwitchAccount, onLogou
           <DialogTitle className="text-xl">Add another account</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleAddAccount} className="space-y-4 pt-4">
+          <p className="text-sm text-muted-foreground">
+            You'll continue on Bluesky's OAuth page. It may mention general account actions, but
+            BlueAT Drive only uses access needed for uploads and your drive records.
+          </p>
           <div className="space-y-2">
             <Label htmlFor="handle-add" className="text-sm font-medium">
               Handle or DID
